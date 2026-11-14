@@ -37,13 +37,13 @@ public final class VoiceGateway implements RecognitionListener {
  public void onPermission(boolean granted){if(granted)listen();else emit("error","마이크 권한이 필요합니다. 화면 선택은 계속 사용할 수 있어요.");}
  public void cancel(){if(recognizer!=null)recognizer.cancel();listening=false;}
  public void release(){if(recognizer!=null)recognizer.destroy();recognizer=null;listening=false;}
- @Override public void onReadyForSpeech(Bundle params){emit("status","학습 번호나 이름을 말씀해 주세요.");}
+ @Override public void onReadyForSpeech(Bundle params){emit("status","말씀해 주세요.");}
  @Override public void onBeginningOfSpeech(){}
  @Override public void onRmsChanged(float rms){}
  @Override public void onBufferReceived(byte[] buffer){}
  @Override public void onEndOfSpeech(){}
  @Override public void onError(int code){listening=false;emit("error","음성을 확인하지 못했어요. 다시 시도하거나 화면에서 선택해 주세요. ("+code+")");}
- @Override public void onResults(Bundle results){listening=false;ArrayList<String> list=results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);if(list!=null&&!list.isEmpty())emit("text",list.get(0));else emit("error","학습 번호나 이름을 다시 말씀해 주세요.");}
+ @Override public void onResults(Bundle results){listening=false;ArrayList<String> list=results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);if(list!=null&&!list.isEmpty())emit("text",list.get(0));else emit("error","다시 말씀해 주세요.");}
  @Override public void onPartialResults(Bundle results){}
  @Override public void onEvent(int type,Bundle params){}
 }
