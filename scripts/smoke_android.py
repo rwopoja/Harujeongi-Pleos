@@ -21,6 +21,7 @@ for node in root.iter('node'):
   adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2));break
 else: raise AssertionError('Battery query button not found')
 time.sleep(16);root=tree();state=ET.tostring(root,encoding='unicode')
+(OUT/'battery-tree.xml').write_text(state);shot('01-battery-debug')
 assert ('조회 실패' in state or '조회 응답이 없습니다' in state), 'Missing explicit unavailable state on ordinary Android'
 assert 'Pleos 조회값' not in state, 'Unexpected vehicle reading on ordinary Android'
 shot('01-battery-unavailable')
