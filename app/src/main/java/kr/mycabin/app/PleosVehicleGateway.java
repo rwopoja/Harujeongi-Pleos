@@ -52,6 +52,21 @@ final class PleosVehicleGateway {
    emit("PARK_STATE",verifiedParked()?"실제 API: P / 정지 / 주차브레이크 확인":"실제 주차 상태 미확인: 쓰기 잠금");
   }catch(Exception e){fail(e);}
  }
+ /** Read-only EV SOC request. Success is reported only by SDK callbacks. */
+ void readBattery(){
+  try{
+   if(vehicle==null){vehicle=new Vehicle(activity);vehicle.initialize();}
+   emit("EV_STATUS","배터리 조회 지원 여부 확인 중");
+   vehicle.getEvBattery().checkEvBatteryStateOfChargeCapabilities(config->{
+    if(config.getAccessType()!=AccessType.READ && config.getAccessType()!=AccessType.READ_WRITE){emit("EV_ERROR","이 차량에서 배터리 잔량 읽기가 지원되지 않습니다.");return Unit.INSTANCE;}
+    vehicle.getEvBattery().getEvBatteryStateOfCharge(value->{
+     if(value==null||value<0||value>100)emit("EV_ERROR","유효하지 않은 배터리 잔량을 받았습니다.");else emit("EV_SOC",value);
+     return Unit.INSTANCE;
+    },e->{emit("EV_ERROR",e.getClass().getSimpleName()+": "+e.getMessage());return Unit.INSTANCE;});
+    return Unit.INSTANCE;
+   },e->{emit("EV_ERROR",e.getClass().getSimpleName()+": "+e.getMessage());return Unit.INSTANCE;});
+  }catch(Exception e){emit("EV_ERROR",e.getClass().getSimpleName()+": "+e.getMessage());}
+ }
  /** Public Android Automotive API only; reflection avoids a hard dependency on optional android.car. */
  boolean verifiedParked(){
   try{
