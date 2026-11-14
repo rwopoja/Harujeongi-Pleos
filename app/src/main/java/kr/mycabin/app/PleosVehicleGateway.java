@@ -55,6 +55,8 @@ final class PleosVehicleGateway {
  /** Read-only EV SOC request. Success is reported only by SDK callbacks. */
  void readBattery(String requestId){
   try{
+   android.content.Intent serviceIntent=new android.content.Intent("ai.pleos.playground.vehicle.VEHICLE_START");
+   if(activity.getPackageManager().resolveService(serviceIntent,0)==null){emit("EV_ERROR_"+requestId,"Pleos 차량 서비스를 찾을 수 없습니다.");return;}
    if(vehicle==null){vehicle=new Vehicle(activity);vehicle.initialize();}
    emit("EV_STATUS_"+requestId,"배터리 조회 지원 여부 확인 중");
    vehicle.getEvBattery().checkEvBatteryStateOfChargeCapabilities(config->{
