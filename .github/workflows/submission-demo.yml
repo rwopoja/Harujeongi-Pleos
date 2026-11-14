@@ -31,6 +31,8 @@ jobs:
           rm -f 'apk/김재윤_마이캐빈_release.apk'
           python3 scripts/build_local.py
           sha256sum 'apk/김재윤_마이캐빈_release.apk'
+      - name: Inspect EV battery SDK signatures
+        run: javap -classpath /tmp/mycabin-deps/Vehicle-2.3.2-unpacked/classes.jar ai.pleos.playground.vehicle.api.EvBattery
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
