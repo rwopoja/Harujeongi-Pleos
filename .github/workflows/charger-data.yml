@@ -14,7 +14,9 @@ jobs:
         run: |
           curl -fL --retry 2 --max-time 90 'https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000002889115&fileDetailSn=1&insertDataPrcus=N' -o charger-data
           curl -fL --max-time 60 'https://www.data.go.kr/data/15102458/fileData.do' -o portal-page || true
-          wc -c portal-page || true
+          curl -fL --max-time 60 'https://www.data.go.kr/js/biz/datset/script_fileDetail.js' -o portal.js || true
+          wc -c portal-page portal.js || true
+          grep -n -A75 -B3 'fn_fileDataDown' portal.js | head -200 || true
           grep -iE 'fileDownload|atchFileId|fileDetailSn|csv' portal-page | head -40 || true
           for url in 'https://overpass.private.coffee/api/status' 'https://overpass-api.de/api/status' 'https://maps.mail.ru/osm/tools/overpass/api/status'; do
             echo "Checking $url"
@@ -29,3 +31,4 @@ jobs:
           path: |
             charger-data
             portal-page
+            portal.js
