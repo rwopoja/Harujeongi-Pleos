@@ -592,10 +592,16 @@
       $('charge-result').textContent = '차량 잔량을 확인하고 충전 계획을 다시 계산해 주세요.';
     }
   });
+  function readSafeHistory() {
+    try {
+      const rows = JSON.parse(localStorage.getItem('ev-day-history-v1') || '[]');
+      if (!Array.isArray(rows) || rows.some(h => !h || typeof h !== 'object' || !Number.isFinite(h.predicted) || h.predicted < 0 || h.predicted > 100 || !Number.isFinite(h.actual) || h.actual < 0 || h.actual > 100)) return null;
+      return rows;
+    } catch (_) { return null; }
+  }
   function historyStats() {
-    let rows = [];
-    try { rows = JSON.parse(localStorage.getItem('ev-day-history-v1') || '[]'); } catch (_) {}
-    if (!Array.isArray(rows)) rows = [];
+    let rows = readSafeHistory();
+    if (!rows) { $('history-stats').textContent = '읽을 수 없는 기록이 있어 통계를 표시하지 않습니다. 원본을 내보내 확인하세요.'; return; }
     rows = rows.filter(h => h && h.noCharge === true && Number.isFinite(h.predicted) && h.predicted >= 0 && h.predicted <= 100 && Number.isFinite(h.actual) && h.actual >= 0 && h.actual <= 100);
     if (rows.length < 3) { $('history-stats').textContent = '충전 없이 이동거리가 일치한 확인 기록이 3개 이상이면 과거 예측 오차를 표시합니다.'; return; }
     const mae = rows.reduce((sum,h) => sum + Math.abs(h.actual-h.predicted),0)/rows.length;
@@ -608,12 +614,11 @@
   $('save-history').addEventListener('click', historyStats);
   $('delete-history').addEventListener('click', historyStats);
   $('apply-eff').addEventListener('click', () => {
-    let rows = [];
-    try { rows = JSON.parse(localStorage.getItem('ev-day-history-v1') || '[]'); } catch (_) {}
-    if (!Array.isArray(rows)) rows = [];
+    let rows = readSafeHistory();
+    if (!rows) { $('eff-suggestion').textContent = '읽을 수 없는 기록이 있어 참고 전비를 적용하지 않습니다. 원본을 내보내 확인하세요.'; return; }
     const values = rows.flatMap(h => {
-      const v = h.inputs;
-      if (!h.noCharge || !v || ![v.soc,v.cap,v.distance,v.hours,v.power,h.actual].every(Number.isFinite) || v.distance <= 0 || h.actual >= v.soc) return [];
+      const v = h && h.inputs;
+      if (!h || !h.noCharge || !v || ![v.soc,v.cap,v.distance,v.hours,v.power,h.actual].every(Number.isFinite) || v.distance <= 0 || h.actual >= v.soc) return [];
       const energy = (v.soc-h.actual)*v.cap/100-v.hours*v.power;
       const efficiency = v.distance/energy;
       return energy > 0 && efficiency >= 0.1 && efficiency <= 20 ? [efficiency] : [];
@@ -627,9 +632,11 @@
   });
   $('export-history').addEventListener('click', () => {
     if (!window.HaruNative || !window.HaruNative.exportData) { $('eff-suggestion').textContent = '설치형 앱에서 기록을 내보낼 수 있습니다.'; return; }
-    let rows = [];
-    try { rows = JSON.parse(localStorage.getItem('ev-day-history-v1') || '[]'); } catch (_) {}
-    window.HaruNative.exportData(JSON.stringify({version:1,history:Array.isArray(rows)?rows:[]}));
+    let raw = null;
+    try { raw = localStorage.getItem('ev-day-history-v1'); } catch (_) { $('eff-suggestion').textContent = '기록을 읽지 못했습니다.'; return; }
+    let rows;
+    try { rows = JSON.parse(raw || '[]'); } catch (_) { rows = null; }
+    window.HaruNative.exportData(JSON.stringify({version:1,history:Array.isArray(rows)?rows:null,originalStorage:raw}));
     $('eff-suggestion').textContent = '공유할 앱을 선택하세요. 경유지 등 개인 정보가 포함됩니다.';
   });
   $('reminder-set').addEventListener('click', () => {
