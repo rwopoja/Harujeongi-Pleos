@@ -9,6 +9,14 @@ on:
       - 'scripts/build_local.py'
       - 'scripts/smoke_android.py'
       - '.github/workflows/runtime.yml'
+  pull_request:
+    paths:
+      - 'apk/**'
+      - 'app/**'
+      - 'web/**'
+      - 'scripts/build_local.py'
+      - 'scripts/smoke_android.py'
+      - '.github/workflows/runtime.yml'
 permissions:
   contents: read
 jobs:

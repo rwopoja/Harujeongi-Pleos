@@ -8,6 +8,13 @@ on:
       - 'web/**'
       - 'scripts/build_local.py'
       - 'scripts/smoke_pleos.py'
+  pull_request:
+    paths:
+      - '.github/workflows/pleos-runtime.yml'
+      - 'app/**'
+      - 'web/**'
+      - 'scripts/build_local.py'
+      - 'scripts/smoke_pleos.py'
 permissions:
   contents: read
 jobs:
