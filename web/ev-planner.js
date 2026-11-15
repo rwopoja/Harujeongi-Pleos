@@ -581,10 +581,14 @@
     let rows = [];
     try { rows = JSON.parse(localStorage.getItem('ev-day-history-v1') || '[]'); } catch (_) {}
     if (!Array.isArray(rows)) rows = [];
-    rows = rows.filter(h => h.noCharge && Number.isFinite(h.predicted) && Number.isFinite(h.actual));
-    $('history-stats').textContent = rows.length < 3
-      ? '충전 없이 이동거리가 일치한 확인 기록이 3개 이상이면 과거 예측 오차를 표시합니다.'
-      : '확인 기록 ' + rows.length + '건의 평균 절대 오차 ' + (rows.reduce((sum,h) => sum + Math.abs(h.actual-h.predicted),0)/rows.length).toFixed(1) + '%p. 이 값은 과거 기록이며 다음 일정의 오차를 보장하지 않습니다.';
+    rows = rows.filter(h => h && h.noCharge === true && Number.isFinite(h.predicted) && h.predicted >= 0 && h.predicted <= 100 && Number.isFinite(h.actual) && h.actual >= 0 && h.actual <= 100);
+    if (rows.length < 3) { $('history-stats').textContent = '충전 없이 이동거리가 일치한 확인 기록이 3개 이상이면 과거 예측 오차를 표시합니다.'; return; }
+    const mae = rows.reduce((sum,h) => sum + Math.abs(h.actual-h.predicted),0)/rows.length;
+    const rmse = Math.sqrt(rows.reduce((sum,h) => sum + (h.actual-h.predicted)**2,0)/rows.length);
+    const withReserve = rows.filter(h => h.inputs && Number.isFinite(h.inputs.reserve) && h.inputs.reserve >= 0 && h.inputs.reserve <= 100);
+    const missed = withReserve.filter(h => h.predicted >= h.inputs.reserve && h.actual < h.inputs.reserve).length;
+    const falseAlert = withReserve.filter(h => h.predicted < h.inputs.reserve && h.actual >= h.inputs.reserve).length;
+    $('history-stats').textContent = '확인 기록 ' + rows.length + '건 · 평균 절대 오차 ' + mae.toFixed(1) + '%p · RMSE ' + rmse.toFixed(1) + '%p. 목표 잔량 기록 ' + withReserve.length + '건 중 부족 미감지 ' + missed + '건 · 부족 오탐 ' + falseAlert + '건. 이 값은 과거 사용자 확인 기록이며 다음 일정의 정확도를 보장하지 않습니다.';
   }
   $('save-history').addEventListener('click', historyStats);
   $('delete-history').addEventListener('click', historyStats);
