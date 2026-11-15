@@ -1,0 +1,30 @@
+name: Inspect NaviHelper SDK
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/inspect-navi.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Inspect official SDK dependencies and Java API
+        shell: bash
+        run: |
+          base='https://nexus-playground.pleos.ai/repository/maven-releases/ai/pleos/playground/NaviHelper/3.0.5'
+          curl -fSs "$base/NaviHelper-3.0.5.pom" -o navi.pom
+          cat navi.pom
+          curl -fSs "$base/NaviHelper-3.0.5.aar" -o navi.aar
+          unzip -o navi.aar classes.jar AndroidManifest.xml
+          cat AndroidManifest.xml || true
+          jar tf classes.jar | grep -E 'NaviHelper|DestinationInfo|TripInfo|WaypointInfo|NaviError'
+          javap -classpath classes.jar ai.pleos.playground.navi.helper.NaviHelper
+          javap -classpath classes.jar ai.pleos.playground.navi.helper.listener.NaviHelperEventListener
+          javap -classpath classes.jar ai.pleos.playground.navi.data.DestinationInfo
+          javap -classpath classes.jar ai.pleos.playground.navi.data.TripInfo || true
