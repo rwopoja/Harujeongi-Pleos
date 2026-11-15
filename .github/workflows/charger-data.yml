@@ -26,4 +26,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: kepco-public-charger-data
-          path: charger-data
+          path: |
+            charger-data
+            portal-page
