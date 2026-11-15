@@ -28,6 +28,10 @@ jobs:
           javap -classpath classes.jar ai.pleos.playground.navi.helper.listener.NaviHelperEventListener
           curl -fSs 'https://nexus-playground.pleos.ai/repository/maven-releases/ai/pleos/playground/navi-data/3.0.4/navi-data-3.0.4.aar' -o data.aar
           unzip -p data.aar classes.jar > data.jar
+          curl -fSs 'https://nexus-playground.pleos.ai/repository/maven-releases/ai/pleos/playground/navi-data/3.0.4/navi-data-3.0.4.pom' -o data.pom
+          cat data.pom
+          curl -fSs 'https://nexus-playground.pleos.ai/repository/maven-releases/ai/pleos/playground/navi-aidl/3.0.1/navi-aidl-3.0.1.pom' -o aidl.pom
+          cat aidl.pom
           javap -classpath data.jar ai.pleos.playground.navi.data.DestinationInfo
           javap -classpath data.jar ai.pleos.playground.navi.data.TripInfo
           javap -classpath data.jar ai.pleos.playground.navi.data.WaypointInfo
