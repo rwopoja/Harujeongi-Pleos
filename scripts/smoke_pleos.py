@@ -20,7 +20,7 @@ def tap_label(xml, label):
     except ET.ParseError: return False
     for node in root.iter("node"):
         if label != node.get("text", "") and label != node.get("content-desc", ""): continue
-        if node.get("package") != "kr.mycabin.app" or node.get("class") != "android.widget.Button": continue
+        if node.get("package") != "kr.harujeongi.app" or node.get("class") != "android.widget.Button": continue
         b = re.findall(r"\d+", node.get("bounds", ""))
         if len(b) != 4: continue
         x1,y1,x2,y2 = map(int,b)
@@ -41,14 +41,14 @@ library = tree()
 (OUT/"library-tree.xml").write_text(library)
 opened_from_library = tap_label(library,"하루전기")
 if not opened_from_library:
-    adb("shell","am","start","-W","-n","kr.mycabin.app/.MainActivity")
+    adb("shell","am","start","-W","-n","kr.harujeongi.app/.MainActivity")
 found = False
 for i in range(10):
     time.sleep(15)
     xml = tree()
     (OUT/"tree.xml").write_text(xml)
     screenshot("02-latest-app-window")
-    if 'resource-id="read-soc"' in xml and 'package="kr.mycabin.app"' in xml:
+    if 'resource-id="read-soc"' in xml and 'package="kr.harujeongi.app"' in xml:
         found = True
         break
 (OUT/"launch-method.txt").write_text("launcher" if opened_from_library else "adb activity")
@@ -62,8 +62,8 @@ if tap_label(xml,"차량 배터리 조회"):
     (OUT/"battery-tree.xml").write_text(xml)
     screenshot("03-pleos-battery-result")
     (OUT/"battery-logcat.txt").write_text(adb("logcat","-d",check=False))
-if 'package="kr.mycabin.app"' not in xml:
-    adb("shell","am","start","-W","-n","kr.mycabin.app/.MainActivity")
+if 'package="kr.harujeongi.app"' not in xml:
+    adb("shell","am","start","-W","-n","kr.harujeongi.app/.MainActivity")
     time.sleep(15)
     xml=tree()
 for i in range(6):

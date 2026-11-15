@@ -7,7 +7,7 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 SDK=pathlib.Path(os.environ['ANDROID_HOME']);JDK=pathlib.Path(os.environ['JAVA_HOME'])
 TOOLS=SDK/'build-tools/35.0.0';ANDROID=SDK/'platforms/android-35/android.jar'
 BUILD=ROOT/'app/build/manual';BUILD.mkdir(parents=True,exist_ok=True)
-CACHE=pathlib.Path(os.environ.get('MYCABIN_DEPS','/tmp/mycabin-deps'));CACHE.mkdir(exist_ok=True)
+CACHE=pathlib.Path(os.environ.get('HARUJEONGI_DEPS','/tmp/harujeongi-deps'));CACHE.mkdir(exist_ok=True)
 COORDS=[
  ('ai.pleos.playground','Vehicle','2.3.2','aar'),('ai.pleos.playground','vehicle-aidl','1.1.1','aar'),('ai.pleos.playground','vehicle-data','1.1.11','aar'),
  ('ai.pleos.playground','NaviHelper','3.0.5','aar'),('ai.pleos.playground','navi-aidl','3.0.1','aar'),('ai.pleos.playground','navi-data','3.0.4','aar'),
@@ -52,11 +52,11 @@ for i,res in enumerate(dep_resources+[ROOT/'app/src/main/res']):
 gen=BUILD/'gen';gen.mkdir(exist_ok=True)
 unsigned=BUILD/'unsigned.apk'
 manifest=BUILD/'AndroidManifest.xml'
-manifest.write_text((ROOT/'app/src/main/AndroidManifest.xml').read_text().replace('<manifest xmlns:android=', '<manifest package="kr.mycabin.app" xmlns:android=',1))
+manifest.write_text((ROOT/'app/src/main/AndroidManifest.xml').read_text().replace('<manifest xmlns:android=', '<manifest package="kr.harujeongi.app" xmlns:android=',1))
 run([TOOLS/'aapt2','link','--auto-add-overlay','-I',ANDROID,'--manifest',manifest,'--min-sdk-version','28','--target-sdk-version','35','--version-code','1','--version-name','0.1.0','-A',ROOT/'web','--java',gen,'-o',unsigned,*sum((['-R',p] for p in compiled),[])])
 classes=BUILD/'classes';classes.mkdir(exist_ok=True)
 sources=list((ROOT/'app/src/main/java').rglob('*.java'))+list(gen.rglob('*.java'))
-run([JDK/'bin/javac','--release','17','-classpath',os.pathsep.join(map(str,[ANDROID,*jars])),'-d',classes,*sources])
+run([JDK/'bin/javac','-source','17','-target','17','-classpath',os.pathsep.join(map(str,[ANDROID,*jars])),'-d',classes,*sources])
 ownjar=BUILD/'app.jar';run([JDK/'bin/jar','cf',ownjar,'-C',classes,'.'])
 dex=BUILD/'dex';dex.mkdir(exist_ok=True)
 run([TOOLS/'d8','--release','--min-api','28','--lib',ANDROID,'--output',dex,ownjar,*jars])
@@ -64,10 +64,11 @@ with zipfile.ZipFile(unsigned,'a',compression=zipfile.ZIP_DEFLATED) as z:
  for p in dex.glob('*.dex'):z.write(p,p.name)
  # AAR resources merged above; required Vehicle binding permission/query/metadata are explicitly declared in the app manifest.
 aligned=BUILD/'aligned.apk';run([TOOLS/'zipalign','-f','4',unsigned,aligned])
-keystore=pathlib.Path(os.environ.get('MYCABIN_KEYSTORE','/tmp/mycabin-contest-signing.jks'))
-password=os.environ.get('MYCABIN_KEYSTORE_PASSWORD','mycabin-local-build')
-if not keystore.exists():run([JDK/'bin/keytool','-genkeypair','-keystore',keystore,'-alias','mycabin','-keyalg','RSA','-keysize','2048','-validity','3650','-storepass',password,'-keypass',password,'-dname','CN=MyCabin Contest'])
+keystore=pathlib.Path(os.environ.get('HARUJEONGI_KEYSTORE','/tmp/harujeongi-contest-signing.jks'))
+password=os.environ.get('HARUJEONGI_KEYSTORE_PASSWORD','harujeongi-local-build')
+if not keystore.exists():run([JDK/'bin/keytool','-genkeypair','-keystore',keystore,'-alias','harujeongi','-keyalg','RSA','-keysize','2048','-validity','3650','-storepass',password,'-keypass',password,'-dname','CN=Harujeongi Contest'])
 out=ROOT/'apk/김재윤_하루전기_release.apk'
-env=os.environ.copy();env['CABIN_SIGN_PASS']=password
-subprocess.run([str(TOOLS/'apksigner'),'sign','--ks',str(keystore),'--ks-key-alias','mycabin','--ks-pass','env:CABIN_SIGN_PASS','--key-pass','env:CABIN_SIGN_PASS','--out',str(out),str(aligned)],check=True,env=env)
+out.parent.mkdir(parents=True, exist_ok=True)
+env=os.environ.copy();env['HARU_SIGN_PASS']=password
+subprocess.run([str(TOOLS/'apksigner'),'sign','--ks',str(keystore),'--ks-key-alias','harujeongi','--ks-pass','env:HARU_SIGN_PASS','--key-pass','env:HARU_SIGN_PASS','--out',str(out),str(aligned)],check=True,env=env)
 run([TOOLS/'apksigner','verify','--verbose',out]);print('APK:',out,flush=True)

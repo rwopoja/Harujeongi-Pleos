@@ -1,4 +1,4 @@
-package kr.mycabin.app;
+package kr.harujeongi.app;
 
 import android.app.Activity;
 import android.os.Bundle;
@@ -44,7 +44,7 @@ public final class MainActivity extends Activity {
   settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
   settings.setMediaPlaybackRequiresUserGesture(true);
   WebView.setWebContentsDebuggingEnabled(false);
-  web.addJavascriptInterface(new Bridge(), "CabinNative");
+  web.addJavascriptInterface(new Bridge(), "HaruNative");
   pleos=new PleosVehicleGateway(this,web);
   voice=new VoiceGateway(this,web);
   map=new EvMapGateway(web);
@@ -72,7 +72,7 @@ public final class MainActivity extends Activity {
   setContentView(web);
   web.loadUrl(ORIGIN+"ev-day.html");
  }
- private void speechResult(String id,boolean error){if(id==null||id.isEmpty())return;runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.dispatchEvent(new CustomEvent('cabin-audio',{detail:{id:"+org.json.JSONObject.quote(id)+",error:"+error+"}}))",null);});}
+ private void speechResult(String id,boolean error){if(id==null||id.isEmpty())return;runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.dispatchEvent(new CustomEvent('haru-audio',{detail:{id:"+org.json.JSONObject.quote(id)+",error:"+error+"}}))",null);});}
  private void reminderMessage(String text){web.evaluateJavascript("window.dispatchEvent(new CustomEvent('ev-reminder',{detail:"+org.json.JSONObject.quote(text)+"}))",null);}
  private void setReminder(int minutes){
   if(minutes<1||minutes>1440){reminderMessage("알림 시간을 확인해 주세요.");return;}
@@ -106,5 +106,5 @@ public final class MainActivity extends Activity {
  @Override public void onBackPressed(){if(web!=null && web.canGoBack())web.goBack();else super.onBackPressed();}
  @Override protected void onPause(){super.onPause();if(tts!=null)tts.stop();if(voice!=null)voice.cancel();web.evaluateJavascript("window.dispatchEvent(new Event('pagehide'))",null);web.onPause();}
  @Override protected void onResume(){super.onResume();if(web!=null)web.onResume();}
- @Override protected void onDestroy(){if(push!=null)push.release();if(ux!=null)ux.release();if(navi!=null)navi.release();if(map!=null)map.release();if(voice!=null)voice.release();if(pleos!=null)pleos.release();if(tts!=null)tts.shutdown();if(web!=null){web.removeJavascriptInterface("CabinNative");web.destroy();}super.onDestroy();}
+ @Override protected void onDestroy(){if(push!=null)push.release();if(ux!=null)ux.release();if(navi!=null)navi.release();if(map!=null)map.release();if(voice!=null)voice.release();if(pleos!=null)pleos.release();if(tts!=null)tts.shutdown();if(web!=null){web.removeJavascriptInterface("HaruNative");web.destroy();}super.onDestroy();}
 }

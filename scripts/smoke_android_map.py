@@ -54,8 +54,8 @@ def choose_search_result(container, ignore):
     raise AssertionError("Live search did not return a selectable result")
 
 try:
-    adb("shell","pm","clear","kr.mycabin.app")
-    adb("shell","am","start","-W","-n","kr.mycabin.app/.MainActivity")
+    adb("shell","pm","clear","kr.harujeongi.app")
+    adb("shell","am","start","-W","-n","kr.harujeongi.app/.MainActivity")
     time.sleep(12)
     enter("route","Seoul Station")
     click_id("parse-plan")

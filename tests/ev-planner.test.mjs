@@ -8,7 +8,7 @@ const spoken = [];
 const pushes = [];
 let reminder = null;
 let naviRequests = 0;
-w.CabinNative = {
+w.HaruNative = {
   listen(){},
   readBattery(){},
   speak(text, lang, id){ spoken.push({text, lang, id}); },
@@ -47,10 +47,10 @@ assert.equal($('points').children.length, 0, 'speech never modifies the itinerar
 $('apply-draft').click();
 assert.equal($('points').children.length, 3);
 assert.match($('route').value, /서울역 → 강남역 → 집/);
-w.dispatchEvent(new w.CustomEvent('cabin-voice',{detail:{text:'서울역 갔다가 집에 갈게'}}));
+w.dispatchEvent(new w.CustomEvent('haru-voice',{detail:{text:'서울역 갔다가 집에 갈게'}}));
 assert.match(spoken.at(-1).text,/서울역/);
 const priorRoute=$('route').value;
-w.dispatchEvent(new w.CustomEvent('cabin-voice',{detail:{text:'일정이 바뀌었어'}}));
+w.dispatchEvent(new w.CustomEvent('haru-voice',{detail:{text:'일정이 바뀌었어'}}));
 assert.equal($('route').value,priorRoute,'a change question must not replace a saved route');
 assert.match(spoken.at(-1).text,/변경된 출발지/);
 

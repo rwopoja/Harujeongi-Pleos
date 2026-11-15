@@ -21,7 +21,7 @@ def tap_visible(label):
  raise AssertionError('Visible button not found: '+label)
 adb('shell','wm','size','1920x1080');adb('shell','wm','density','160')
 adb('install','-r','apk/김재윤_하루전기_release.apk')
-adb('shell','am','start','-W','-n','kr.mycabin.app/.MainActivity')
+adb('shell','am','start','-W','-n','kr.harujeongi.app/.MainActivity')
 for i in range(18):
  time.sleep(4);root=tree()
  if '계획 계산하기' in ET.tostring(root,encoding='unicode'):break

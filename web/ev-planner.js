@@ -17,7 +17,7 @@
   plan.origin = clean(plan.origin); plan.stops = plan.stops.slice(0, 8).map(clean);
   let draft = [], revision = 0, serial = 0;
   const pending = new Map();
-  let uxRestricted = !!window.CabinNative;
+  let uxRestricted = !!window.HaruNative;
   const uxDisabled = new WeakMap();
   const voiceAllowed = new Set(['start-voice','voice-route','speak-result']);
   function applyUx() {
@@ -76,14 +76,14 @@
     if (speak && draft.length) say('말씀하신 일정은 ' + draft.join(', 그리고 ') + '입니다. 화면에서 확인해 주세요.');
   }
   function say(text) {
-    if (!text || !window.CabinNative || !window.CabinNative.speak) {
+    if (!text || !window.HaruNative || !window.HaruNative.speak) {
       $('speak-status').textContent = '이 기기의 한국어 음성 출력 기능이 필요합니다.'; return;
     }
     $('speak-status').textContent = '음성 안내 요청 중';
-    window.CabinNative.speak(text, 'ko-KR', 'ev-day-result');
+    window.HaruNative.speak(text, 'ko-KR', 'ev-day-result');
   }
   $('speak-result').addEventListener('click', () => say($('result').innerText || $('result').textContent));
-  window.addEventListener('cabin-audio', e => {
+  window.addEventListener('haru-audio', e => {
     if (e.detail && e.detail.id === 'ev-day-result') $('speak-status').textContent = e.detail.error ? '한국어 음성 출력이 준비되지 않았습니다.' : '음성 안내 완료';
   });
   $('parse-plan').addEventListener('click', () => preview($('route').value, false));
@@ -97,7 +97,7 @@
       if (target) target.scrollIntoView({behavior:'smooth',block:'start'});
     });
   }
-  window.addEventListener('cabin-voice', e => {
+  window.addEventListener('haru-voice', e => {
     const heard = String(e.detail?.text || '').trim();
     if (!heard) return;
     $('voice-status').textContent = '인식: ' + heard;
@@ -144,12 +144,12 @@
 
   function request(payload) {
     if (!$('map-consent').checked) return Promise.reject(new Error('외부 지도 서비스 전송에 동의해 주세요.'));
-    if (!window.CabinNative || !window.CabinNative.mapRequest) return Promise.reject(new Error('설치형 앱의 지도 연결이 필요합니다.'));
+    if (!window.HaruNative || !window.HaruNative.mapRequest) return Promise.reject(new Error('설치형 앱의 지도 연결이 필요합니다.'));
     const id = String(Date.now() * 100 + (++serial % 100));
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { pending.delete(id); reject(new Error('응답 시간이 초과됐습니다.')); }, 45000);
       pending.set(id, {resolve, reject, timer});
-      try { window.CabinNative.mapRequest(id, JSON.stringify(payload)); }
+      try { window.HaruNative.mapRequest(id, JSON.stringify(payload)); }
       catch (_) { clearTimeout(timer); pending.delete(id); reject(new Error('지도 연결을 시작하지 못했습니다.')); }
     });
   }
@@ -237,11 +237,11 @@
   }
   let naviLocation = null;
   $('connect-navi').addEventListener('click', () => {
-    if (!window.CabinNative || !window.CabinNative.observeNavi) {
+    if (!window.HaruNative || !window.HaruNative.observeNavi) {
       $('navi-status').textContent = 'Pleos 설치형 앱에서 사용할 수 있습니다.'; return;
     }
     $('navi-status').textContent = 'Pleos 내비 연결 요청 중…';
-    window.CabinNative.observeNavi();
+    window.HaruNative.observeNavi();
   });
   window.addEventListener('ev-navi', event => {
     const data = event.detail || {}, value = data.value;
@@ -374,20 +374,20 @@
     $('eff-suggestion').textContent = '참고 전비 ' + median.toFixed(1) + ' km/kWh를 적용했습니다. 이번 조건에 적절한지 확인한 뒤 다시 계산하세요.';
   });
   $('export-history').addEventListener('click', () => {
-    if (!window.CabinNative || !window.CabinNative.exportData) { $('eff-suggestion').textContent = '설치형 앱에서 기록을 내보낼 수 있습니다.'; return; }
+    if (!window.HaruNative || !window.HaruNative.exportData) { $('eff-suggestion').textContent = '설치형 앱에서 기록을 내보낼 수 있습니다.'; return; }
     let rows = [];
     try { rows = JSON.parse(localStorage.getItem('ev-day-history-v1') || '[]'); } catch (_) {}
-    window.CabinNative.exportData(JSON.stringify({version:1,history:Array.isArray(rows)?rows:[]}));
+    window.HaruNative.exportData(JSON.stringify({version:1,history:Array.isArray(rows)?rows:[]}));
     $('eff-suggestion').textContent = '공유할 앱을 선택하세요. 경유지 등 개인 정보가 포함됩니다.';
   });
   $('reminder-set').addEventListener('click', () => {
-    if (!window.CabinNative || !window.CabinNative.setReminder) { $('reminder-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
+    if (!window.HaruNative || !window.HaruNative.setReminder) { $('reminder-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
     $('reminder-status').textContent = '알림을 예약하고 있습니다…';
-    window.CabinNative.setReminder(Number($('reminder-minutes').value));
+    window.HaruNative.setReminder(Number($('reminder-minutes').value));
   });
   $('reminder-cancel').addEventListener('click', () => {
-    if (!window.CabinNative || !window.CabinNative.cancelReminder) { $('reminder-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
-    window.CabinNative.cancelReminder();
+    if (!window.HaruNative || !window.HaruNative.cancelReminder) { $('reminder-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
+    window.HaruNative.cancelReminder();
   });
   window.addEventListener('ev-reminder', e => { $('reminder-status').textContent = String(e.detail || ''); });
   let pushPrefs = {};
@@ -420,7 +420,7 @@
     const topic = $('push-topic').value;
     if (!$('push-consent').checked) { $('push-status').textContent = '알림 서비스 전송에 동의해 주세요.'; return; }
     if (!/^harujeongi-[a-f0-9]{48}$/.test(topic)) { $('push-status').textContent = '먼저 연결 코드를 만들어 주세요.'; return; }
-    if (!window.CabinNative || !window.CabinNative.pushRequest) { $('push-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
+    if (!window.HaruNative || !window.HaruNative.pushRequest) { $('push-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
     const id = String(Date.now()*100+(++pushSerial%100));
     pushPending.set(id, action);
     if (action === 'schedule') { try { localStorage.setItem('ev-push-pending-v1','1'); } catch (_) {} }
@@ -428,7 +428,7 @@
       if (pushPending.delete(id)) $('push-status').textContent = '응답 시간이 초과됐습니다. 서버 예약 여부를 확인하거나 취소를 요청하세요.';
     }, 30000);
     $('push-status').textContent = '알림 서버에 요청 중…';
-    try { window.CabinNative.pushRequest(id, JSON.stringify({action,topic,minutes:Number($('push-minutes').value),low})); }
+    try { window.HaruNative.pushRequest(id, JSON.stringify({action,topic,minutes:Number($('push-minutes').value),low})); }
     catch (_) { pushPending.delete(id); $('push-status').textContent = '알림 요청을 시작하지 못했습니다.'; }
   }
   window.addEventListener('ev-push', e => {

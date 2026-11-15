@@ -4,7 +4,7 @@
 
 ## 실행 및 확인
 
-- APK와 Android 실행 검증 결과: [Actions 빌드 목록](https://github.com/rwopoja/MyCabin-Pleos/actions/workflows/submission-demo.yml). 대상 커밋의 성공한 실행에서 `MyCabin-signed-APK-and-Android-demo` 산출물을 내려받습니다. 저장소의 예전 MyCabin APK는 이번 하루전기 앱이 아닙니다.
+- APK와 Android 실행 검증 결과: [Actions 빌드 목록](https://github.com/rwopoja/MyCabin-Pleos/actions/workflows/submission-demo.yml). 대상 커밋의 성공한 실행에서 APK 산출물을 확인합니다. 새 패키지의 빌드 결과는 해당 커밋의 검사에서 따로 확인해야 합니다.
 - Android 9(API 28) 이상 기기 또는 에뮬레이터에 설치합니다. Pleos 전용 SDK 기능은 Pleos Connect 환경 및 해당 서비스·권한이 필요합니다. 서명이 다른 이전 설치본은 제거해야 할 수 있으며 이때 앱 내부 기록이 삭제됩니다.
 - 일반 PC에서 화면 확인: `python -m http.server 8080 --directory web` 실행 후 `http://localhost:8080/ev-day.html`을 엽니다. 브라우저에서는 Android 음성·알림·지도 연결을 사용할 수 없습니다.
 - 소스 빌드: JDK 17, Android SDK Platform 35 및 Build Tools 35.0.0을 설치하고 `ANDROID_HOME`, `JAVA_HOME`을 지정한 뒤 `python scripts/build_local.py`를 실행합니다. Pleos Nexus와 Maven 저장소 접근이 필요합니다. 결과는 `apk/김재윤_하루전기_release.apk`입니다. 개발용 키는 로컬에서 생성하므로 안정적으로 업데이트·배포하려면 본인이 보관하는 키를 사용해야 합니다.
@@ -39,3 +39,8 @@ node tests/ev-planner.test.mjs
 두 번째 테스트는 모의 지도 응답으로 음성 일정 확인, 데이터 전송 동의, 오래된 응답 차단, 경로·충전소 우회 적용을 검증합니다. 외부 서비스나 Pleos 실차를 대신하는 시험은 아닙니다. GitHub Actions는 일반 Android 14 AVD(1920×1080, density 160)에서 APK 설치와 기본 계산·Pleos 미지원 처리를 확인했습니다. 공식 Pleos Connect 2.1 AVD(1920×1080, density 160)에서도 설치 및 화면 표시를 확인했습니다. 이 확인만으로 차량 정보 조회, 내비 서비스, 음성 인식이나 실제 차량 동작까지 검증된 것은 아닙니다.
 
 Pleos와 현대자동차그룹의 공식 앱이 아닙니다. 제3자 SDK 및 자료 출처는 저장소의 `THIRD_PARTY_NOTICES.md`를 참고하세요.
+
+
+## 패키지 변경
+
+앱 식별자를 `kr.harujeongi.app`으로 변경했습니다. 기존 설치본과 별개 앱으로 설치되며 기존 앱의 로컬 기록은 자동으로 이전되지 않습니다. 기존 설치본 삭제 전에 보관할 데이터를 내보내세요.
