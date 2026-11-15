@@ -30,6 +30,9 @@ jobs:
           node tests/ev-journey-smoke.mjs
           node tests/ev-planner.test.mjs
           node tests/ev-progress.test.mjs
+          node tests/ev-voice-stop.test.mjs
+          node tests/ev-charge-integrated.test.mjs
+          node tests/ev-resume.test.mjs
       - name: Check public map service response formats
         continue-on-error: true
         run: python3 scripts/test_open_services.py

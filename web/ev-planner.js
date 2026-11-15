@@ -92,7 +92,7 @@
     const names = plan.stops.map(p => p.name.trim()).filter(Boolean);
     $('route').value = names.join(' → ');
     if (names.length) $('save-route').click();
-    else { try { localStorage.removeItem('ev-day-route-v1'); } catch (_) {} }
+    else { try { localStorage.removeItem('ev-day-route-v1'); } catch (_) {} window.dispatchEvent(new Event('ev-route-cleared')); }
   };
   const changed = () => {
     revision++;
@@ -127,14 +127,60 @@
     value = value.replace(/(?:에|으로|로)?\s*(?:돌아올\s*거(?:야|예요|에요)?|돌아갈\s*거(?:야|예요|에요)?|돌아가(?:요|겠습니다)|돌아와요|가려고\s*해요|갈\s*거(?:야|예요|에요)?|갈게요?|갑니다|가겠습니다|갈래요|가요|간다)\s*[.!?。]*$/g, '');
     return value.split(/\s*(?:→|->|,|，|\n)\s*/).map(x => x.trim().replace(/^(?:그리고|그다음|그 다음)\s*/, '').replace(/(?:에|으로|까지)$/, '').trim()).filter(Boolean).slice(0, 8);
   }
-  window.EvPlanner = {parseStops};
-  function preview(text, speak) {
-    if (/(?:에어컨|히터|공조|기다리|대기|주차(?:해|하고|중|할|한|를|하))/.test(String(text || ''))) {
-      draft = []; $('apply-draft').hidden = true;
-      $('draft-status').textContent = '장소와 정차 중 전기 사용을 한 번에 구분하지 못했습니다. 방문 장소만 먼저 말씀하거나 입력하고, 목적지별 정차 시간과 소비전력을 따로 확인해 주세요.';
-      if (speak) say($('draft-status').textContent);
-      return;
+  const hasStopDescription = text => /(?:에어컨|히터|공조|기다리|대기|주차(?:해|하고|중|할|한|를|하))/.test(String(text || ''));
+  function parseStopDuration(text) {
+    const s = String(text || '');
+    if (/(?:\d+|한|두|세|네)\s*(?:~|∼|에서|부터|내지)\s*(?:\d+|한|두|세|네)/.test(s)) return null;
+    const words = {한:1,두:2,세:3,네:4,다섯:5,여섯:6,일곱:7,여덟:8,아홉:9,열:10,십:10,십오:15,이십:20,삼십:30,사십:40,오십:50};
+    const hourMatches = [...s.matchAll(/(\d+(?:\.\d+)?|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*시간/g)];
+    const minuteMatches = [...s.matchAll(/(\d+(?:\.\d+)?|십오|이십|삼십|사십|오십|십)\s*분/g)];
+    if (hourMatches.length > 1 || minuteMatches.length > 1) return null;
+    const number = x => Object.prototype.hasOwnProperty.call(words,x) ? words[x] : Number(x);
+    let hours = hourMatches.length ? number(hourMatches[0][1]) : 0;
+    if (minuteMatches.length && /시간\s*반/.test(s)) return null;
+    if (hourMatches.length && /시간\s*반/.test(s)) hours += 0.5;
+    if (!hourMatches.length && /반\s*시간/.test(s)) hours = 0.5;
+    if (minuteMatches.length) {
+      if (hourMatches.length && !/시간\s*(?:하고\s*)?(?:\d+(?:\.\d+)?|십오|이십|삼십|사십|오십|십)\s*분/.test(s)) return null;
+      hours += number(minuteMatches[0][1]) / 60;
     }
+    return (hourMatches.length || minuteMatches.length || /반\s*시간/.test(s)) && Number.isFinite(hours) && hours >= 0 && hours <= 24 ? hours : null;
+  }
+  window.EvPlanner = {parseStops, parseStopDuration};
+  let stopDraftRevision = null;
+  function previewStop(text, speak) {
+    draft = []; $('apply-draft').hidden = true;
+    const options = $('voice-stop-index'); options.replaceChildren();
+    const blank = document.createElement('option'); blank.value = ''; blank.textContent = '목적지를 선택하세요'; options.append(blank);
+    plan.stops.forEach((p, i) => { const option = document.createElement('option'); option.value = String(i); option.textContent = (i+1) + '. ' + (p.name || '이름 없는 목적지'); options.append(option); });
+    $('voice-stop-hours').value = ''; $('voice-stop-power').value = ''; $('voice-stop-result').textContent = '';
+    const duration = parseStopDuration(text);
+    if (duration !== null) $('voice-stop-hours').value = String(duration);
+    stopDraftRevision = revision;
+    $('voice-stop-draft').hidden = false;
+    $('voice-stop-status').textContent = plan.stops.length
+      ? '인식: ' + String(text).slice(0,500) + '. 적용할 목적지와 시간, 평균 소비전력을 직접 확인하세요.'
+      : '먼저 방문 장소를 일정에 추가해 주세요. 이후 정차 내용을 다시 말씀해 주세요.';
+    $('draft-status').textContent = '정차 계획은 확인 후 적용됩니다. 목적지와 소비전력을 선택해 주세요.';
+    if (speak) say('정차할 목적지와 전기 사용 시간, 소비전력을 확인해 주세요.');
+  }
+  $('voice-stop-cancel').addEventListener('click', () => { stopDraftRevision = null; $('voice-stop-draft').hidden = true; });
+  $('voice-stop-apply').addEventListener('click', () => {
+    const index = $('voice-stop-index').value, hours = $('voice-stop-hours'), power = $('voice-stop-power');
+    if (stopDraftRevision === null || revision !== stopDraftRevision) { $('voice-stop-result').textContent = '일정이 변경됐습니다. 정차 내용을 다시 입력해 주세요.'; return; }
+    if (index === '' || !/^\d+$/.test(index) || !plan.stops[Number(index)] || hours.value === '' || power.value === '' || !hours.checkValidity() || !power.checkValidity()) {
+      $('voice-stop-result').textContent = '목적지와 시간, 평균 소비전력을 모두 확인해 주세요.'; return;
+    }
+    const point = plan.stops[Number(index)]; point.stopHours = Number(hours.value); point.stopPower = Number(power.value);
+    if (!Number.isFinite(point.stopHours) || !Number.isFinite(point.stopPower)) { $('voice-stop-result').textContent = '시간과 전력을 확인해 주세요.'; return; }
+    setStopDirty(true); save(); render();
+    $('apply-stop-energy').click();
+    if (stopDirty) { $('voice-stop-result').textContent = '전체 정차 시간과 입력값을 확인해 주세요.'; return; }
+    stopDraftRevision = null; $('voice-stop-draft').hidden = true;
+    $('draft-status').textContent = point.name + ' 정차 계획을 적용했습니다. 차량 정보와 거리를 확인하고 계획을 다시 계산해 주세요.';
+  });
+  function preview(text, speak) {
+    if (hasStopDescription(text)) { previewStop(text, speak); return; }
     draft = parseStops(text);
     $('draft-status').textContent = draft.length ? '인식한 순서: ' + draft.join(' → ') + '. 장소를 확인한 뒤 적용해 주세요.' : '장소를 나누지 못했습니다. 쉼표나 화살표로 구분해 주세요.';
     $('apply-draft').hidden = !draft.length;
@@ -166,6 +212,7 @@
     const heard = String(e.detail?.text || '').trim();
     if (!heard) return;
     $('voice-status').textContent = '인식: ' + heard;
+    if (hasStopDescription(heard)) { previewStop(heard, true); return; }
     let reply = '';
     if (/(?:일정|계획).*(?:변경|바뀌|바꿀|달라)/.test(heard))
       reply = '변경된 출발지와 경유지를 말씀해 주세요. 장소를 확인한 후 다시 계산하겠습니다.';
@@ -286,7 +333,7 @@
       const powerLabel = document.createElement('label'); powerLabel.textContent = '그 시간의 평균 소비전력 (kW)'; powerLabel.append(power);
       for (const [field, key] of [[hours, 'stopHours'], [power, 'stopPower']]) field.addEventListener('input', () => {
         const value = field.value === '' ? null : Number(field.value);
-        point[key] = value; setStopDirty(true); save();
+        point[key] = value; revision++; setStopDirty(true); save();
         $('stop-energy-status').textContent = '정차 계획이 변경됐습니다. 정차 에너지 적용 버튼을 다시 눌러 주세요.';
         $('result').textContent = '정차 계획이 변경됐습니다. 정차 에너지를 적용하고 계획을 다시 계산해 주세요.';
         $('charge-result').textContent = '정차 계획이 변경됐습니다. 정차 에너지를 적용하고 충전 계획을 다시 계산해 주세요.';

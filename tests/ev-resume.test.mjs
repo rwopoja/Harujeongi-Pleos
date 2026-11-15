@@ -1,0 +1,10 @@
+import {Window} from 'happy-dom';import fs from 'node:fs';import assert from 'node:assert/strict';
+const w=new Window({url:'https://example.test'});w.HaruNative={listen(){}};
+w.localStorage.setItem('ev-day-route-v1',JSON.stringify({name:'회사 → 집',updatedAt:Date.now()-5*3600e3}));
+w.document.write(fs.readFileSync('web/ev-day.html','utf8').replace(/<script[^>]*><\/script>/g,''));for(const f of ['ev-day.js','ev-journey.js','ev-planner.js'])w.eval(fs.readFileSync('web/'+f,'utf8'));
+w.dispatchEvent(new w.CustomEvent('ev-ux',{detail:{state:'phone',restricted:false}}));const $=id=>w.document.getElementById(id);
+assert.equal($('resume-current').hidden,true);$('idle-hours').value='4';$('idle-hours').dispatchEvent(new w.Event('change'));
+assert.equal($('resume-current').hidden,false);assert.match($('resume-status').textContent,/4시간/);assert.match($('resume-status').textContent,/차량 움직임은 확인하지/);
+$('resume-current').click();assert.equal($('resume-current').hidden,true);assert.ok(Date.now()-JSON.parse(w.localStorage.getItem('ev-day-route-v1')).updatedAt<10000);
+assert.equal(JSON.parse(w.localStorage.getItem('ev-idle-hours-v1')),4);$('new-route').click();assert.equal(w.localStorage.getItem('ev-day-route-v1'),null);
+console.log('Configurable saved-itinerary recheck and resume passed');await w.happyDOM.abort();
