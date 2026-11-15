@@ -311,10 +311,11 @@
       const up = button('앞으로', () => { if (i > 0) { [plan.stops[i - 1], plan.stops[i]] = [plan.stops[i], plan.stops[i - 1]]; syncRouteText(); changed(); render(); } }, 'sub');
       const visited = i === 0 ? button('이 장소 방문·정차 완료', () => {
         if (!coordinate(point)) { $('progress-status').textContent = '완료할 장소의 위치를 먼저 확인해 주세요.'; return; }
-        const wasDerived = stopDerived;
+        const wasDerived = stopDerived, hadCharge = $('charge-included').checked;
         plan.origin = {...emptyPoint(point.name), lat:point.lat, lon:point.lon, label:point.label};
         plan.stops.shift(); syncRouteText(); changed();
         $('distance').value = ''; $('charger-distance').value = ''; $('charger-name').value = '';
+        $('charge-included').checked = false; $('charge-added').value = '0'; $('charge-before-idle').value = '';
         distanceFromRoute = false;
         try { localStorage.removeItem('ev-route-distance-derived-v1'); localStorage.setItem('ev-route-distance-invalid-v1','true'); } catch (_) {}
         $('remaining-soc').value = '';
@@ -324,7 +325,7 @@
         else if (plan.stops.length) { $('hours').value = ''; $('power').value = ''; setStopDirty(true); }
         render();
         $('progress-status').textContent = plan.stops.length
-          ? point.name + ' 방문을 완료했습니다. 현재 배터리 잔량과 남은 정차 계획을 확인하고 남은 일정 재계산을 누르세요.'
+          ? point.name + ' 방문을 완료했습니다. 현재 배터리 잔량과 남은 정차 계획을 확인하고 남은 일정 재계산을 누르세요.' + (hadCharge ? ' 이전 충전 계획은 해제했습니다. 남은 충전 계획을 다시 확인하세요.' : '')
           : point.name + ' 방문을 완료했습니다. 남은 목적지가 없습니다.';
       }, 'sub') : null;
       const hours = document.createElement('input'); hours.type = 'number'; hours.min = '0'; hours.max = '24'; hours.step = 'any'; hours.value = point.stopHours; hours.setAttribute('aria-label', '목적지 ' + (i + 1) + ' 차량 전기 사용 시간');
@@ -365,8 +366,9 @@
     $('distance').value = km.toFixed(1);
     distanceFromRoute = true;
     try { localStorage.setItem('ev-route-distance-derived-v1', 'true'); localStorage.removeItem('ev-route-distance-invalid-v1'); } catch (_) {}
+    $('result').textContent = '차량 정보와 정차·충전 계획을 확인하고 있습니다.';
     $('form').dispatchEvent(new Event('submit', {cancelable:true, bubbles:true}));
-    return $('form').checkValidity();
+    return ($('result').innerText || '').includes('예상 소비');
   }
   $('distance').addEventListener('input', () => {
     routeVersion++;
@@ -422,8 +424,7 @@
       }
       $('soc').value = soc;
       $('soc').dispatchEvent(new Event('input', {bubbles:true}));
-      applyDistance(route.distance / 1000);
-      if (!$('form').checkValidity()) { $('progress-status').textContent = '차량 정보와 정차 계획을 확인하고 다시 계산해 주세요.'; return; }
+      if (!applyDistance(route.distance / 1000)) { $('progress-status').textContent = '차량 정보와 정차·충전 계획을 확인하고 다시 계산해 주세요.'; return; }
       $('progress-status').textContent = '현재 잔량 ' + Number(soc).toFixed(1) + '%와 남은 도로 거리 ' + (route.distance / 1000).toFixed(1) + ' km를 반영했습니다. 공용 지도 경로와 실제 교통은 다를 수 있습니다.';
     } catch (e) { if (at === revision && requestVersion === routeVersion) $('progress-status').textContent = e.message; }
   });
@@ -543,8 +544,8 @@
             if (current !== revision || requestVersion !== routeVersion) { host.textContent = '일정이나 경로 요청이 변경되어 다시 검색해야 합니다.'; return; }
             $('charger-name').value = station.name;
             $('charger-distance').value = toStation.toFixed(1);
-            applyDistance(km); $('charge-calc').click();
-            host.append(document.createTextNode(' 계산에 반영했습니다. 아래에서 충전 전력과 결과를 확인하세요.'));
+            const calculated = applyDistance(km); $('charge-calc').click();
+            host.append(document.createTextNode(calculated ? ' 계산에 반영했습니다. 아래에서 충전 전력과 결과를 확인하세요.' : ' 경로 거리를 입력했습니다. 차량 정보와 정차·충전 계획을 확인하고 다시 계산하세요.'));
           }, 'sub'));
         } catch (e) { if (current === revision && requestVersion === routeVersion) host.textContent = e.message; }
       })));

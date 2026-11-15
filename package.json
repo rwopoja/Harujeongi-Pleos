@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test": "node tests/ev-journey-smoke.mjs && node tests/ev-planner.test.mjs && node tests/ev-progress.test.mjs && node tests/ev-voice-stop.test.mjs && node tests/ev-charge-integrated.test.mjs && node tests/ev-resume.test.mjs"
+    "test": "node tests/ev-journey-smoke.mjs && node tests/ev-planner.test.mjs && node tests/ev-progress.test.mjs && node tests/ev-voice-stop.test.mjs && node tests/ev-charge-integrated.test.mjs && node tests/ev-resume.test.mjs && node tests/ev-full-journey.test.mjs"
   },
   "devDependencies": {
     "happy-dom": "21.0.4"
