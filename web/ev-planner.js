@@ -10,7 +10,9 @@
     if (!point || typeof point.name !== 'string') return emptyPoint();
     const cleanPoint = emptyPoint(point.name.slice(0, 150));
     if (Number.isFinite(point.stopHours) && point.stopHours >= 0 && point.stopHours <= 24) cleanPoint.stopHours = point.stopHours;
+    else if ('stopHours' in point) cleanPoint.stopHours = null;
     if (Number.isFinite(point.stopPower) && point.stopPower >= 0 && point.stopPower <= 20) cleanPoint.stopPower = point.stopPower;
+    else if ('stopPower' in point) cleanPoint.stopPower = null;
     if (Number.isFinite(point.lat) && Math.abs(point.lat) <= 90 && Number.isFinite(point.lon) && Math.abs(point.lon) <= 180 && typeof point.label === 'string') {
       cleanPoint.lat = point.lat; cleanPoint.lon = point.lon; cleanPoint.label = point.label.slice(0, 500);
     }
@@ -18,6 +20,29 @@
   };
   plan.origin = clean(plan.origin); plan.stops = plan.stops.slice(0, 8).map(clean);
   let draft = [], revision = 0, serial = 0;
+  let stopDerived = false, stopDirty = false;
+  try {
+    stopDerived = localStorage.getItem('ev-stop-derived-v1') === 'true';
+    stopDirty = localStorage.getItem('ev-stop-dirty-v1') === 'true';
+  } catch (_) {}
+  function setStopDirty(dirty) {
+    stopDirty = dirty;
+    $('hours').setCustomValidity(dirty ? '변경된 정차 계획을 적용하거나 정차 시간 또는 전력을 직접 입력해 주세요.' : '');
+    try { localStorage.setItem('ev-stop-dirty-v1', String(dirty)); } catch (_) {}
+    if (dirty) $('stop-energy-status').textContent = '정차 계획을 다시 적용하거나 정차 시간 또는 전력을 직접 입력해 주세요.';
+  }
+  setStopDirty(stopDirty);
+  function stopStructureChanged() { if (stopDerived) setStopDirty(true); }
+  for (const id of ['hours', 'power']) $(id).addEventListener('input', () => {
+    stopDerived = false;
+    try { localStorage.removeItem('ev-stop-derived-v1'); } catch (_) {}
+    setStopDirty(false);
+  });
+  $('clear').addEventListener('click', () => {
+    stopDerived = false;
+    try { localStorage.removeItem('ev-stop-derived-v1'); } catch (_) {}
+    setStopDirty(false);
+  });
   let distanceFromRoute = false;
   try {
     distanceFromRoute = localStorage.getItem('ev-route-distance-derived-v1') === 'true';
@@ -64,6 +89,7 @@
     $('map-status').textContent = '장소가 바뀌었습니다. 장소를 확인하고 경로를 다시 계산해 주세요.';
     $('result').textContent = '일정이 변경됐습니다. 거리와 차량 정보를 확인하고 다시 계산해 주세요.';
     $('charge-result').textContent = '일정이 변경됐습니다. 충전 계획을 다시 계산해 주세요.';
+    $('charge-scenario-result').textContent = '일정이 변경됐습니다. 충전 후 귀가 잔량을 다시 계산해 주세요.';
     $('charger-list').replaceChildren();
     save();
   };
@@ -134,6 +160,7 @@
   });
   $('apply-draft').addEventListener('click', () => {
     if (!draft.length) return;
+    stopStructureChanged();
     plan.stops = draft.map(emptyPoint);
     $('route').value = draft.join(' → ');
     $('save-route').click(); $('apply-draft').hidden = true;
@@ -142,6 +169,7 @@
   });
   $('add-stop').addEventListener('click', () => {
     if (plan.stops.length >= 8) { $('map-status').textContent = '목적지는 최대 8개입니다.'; return; }
+    stopStructureChanged();
     plan.stops.push(emptyPoint()); changed(); render();
   });
   $('origin').value = plan.origin.name || '';
@@ -207,7 +235,7 @@
       const results = document.createElement('div'); results.textContent = describe(point);
       input.addEventListener('input', () => { point.name = input.value.trim(); point.lat = null; point.lon = null; point.label = ''; results.textContent = describe(point); changed(); });
       const search = button('이 장소 검색', () => searchPoint(point, results), 'sub');
-      const remove = button('삭제', () => { plan.stops.splice(i, 1); changed(); render(); }, 'sub');
+      const remove = button('삭제', () => { plan.stops.splice(i, 1); stopStructureChanged(); changed(); render(); }, 'sub');
       const up = button('앞으로', () => { if (i > 0) { [plan.stops[i - 1], plan.stops[i]] = [plan.stops[i], plan.stops[i - 1]]; changed(); render(); } }, 'sub');
       const hours = document.createElement('input'); hours.type = 'number'; hours.min = '0'; hours.max = '24'; hours.step = 'any'; hours.value = point.stopHours; hours.setAttribute('aria-label', '목적지 ' + (i + 1) + ' 차량 전기 사용 시간');
       const power = document.createElement('input'); power.type = 'number'; power.min = '0'; power.max = '20'; power.step = 'any'; power.value = point.stopPower; power.setAttribute('aria-label', '목적지 ' + (i + 1) + ' 정차 평균 소비전력');
@@ -215,10 +243,11 @@
       const powerLabel = document.createElement('label'); powerLabel.textContent = '그 시간의 평균 소비전력 (kW)'; powerLabel.append(power);
       for (const [field, key] of [[hours, 'stopHours'], [power, 'stopPower']]) field.addEventListener('input', () => {
         const value = field.value === '' ? null : Number(field.value);
-        point[key] = value; save();
+        point[key] = value; setStopDirty(true); save();
         $('stop-energy-status').textContent = '정차 계획이 변경됐습니다. 정차 에너지 적용 버튼을 다시 눌러 주세요.';
         $('result').textContent = '정차 계획이 변경됐습니다. 정차 에너지를 적용하고 계획을 다시 계산해 주세요.';
         $('charge-result').textContent = '정차 계획이 변경됐습니다. 정차 에너지를 적용하고 충전 계획을 다시 계산해 주세요.';
+        $('charge-scenario-result').textContent = '정차 계획이 변경됐습니다. 정차 에너지를 적용하고 다시 계산해 주세요.';
       });
       card.append(heading, input, search, up, remove, results, hoursLabel, powerLabel); host.append(card);
     });
@@ -262,6 +291,13 @@
     $('hours').value = String(hours); $('power').value = String(hours ? energy / hours : 0);
     $('hours').dispatchEvent(new Event('input', {bubbles:true}));
     $('power').dispatchEvent(new Event('input', {bubbles:true}));
+    stopDerived = true; setStopDirty(false);
+    try {
+      localStorage.setItem('ev-stop-derived-v1', 'true');
+      const savedInputs = JSON.parse(localStorage.getItem('ev-day-inputs-v1') || '{}');
+      savedInputs.hours = hours; savedInputs.power = hours ? energy / hours : 0;
+      localStorage.setItem('ev-day-inputs-v1', JSON.stringify(savedInputs));
+    } catch (_) { $('stop-energy-status').textContent = '정차 계획을 저장하지 못했습니다. 다시 적용해 주세요.'; setStopDirty(true); return; }
     $('stop-energy-status').textContent = '정차 전력 합계 ' + energy.toFixed(2) + ' kWh를 계획 입력값에 반영했습니다. 계획 계산하기를 눌러 주세요.';
   });
   $('route-search').addEventListener('click', async () => {
@@ -371,6 +407,7 @@
     $('resume-current').hidden = true; $('resume-new').hidden = true;
   });
   $('new-route').addEventListener('click', () => {
+    stopStructureChanged();
     plan = {origin:emptyPoint(), stops:[]}; draft = []; $('apply-draft').hidden = true;
     $('draft-status').textContent = ''; changed(); render();
   });

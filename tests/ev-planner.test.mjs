@@ -49,6 +49,14 @@ assert.equal($('points').children.length, 3);
 let stopInputs = [...$('points').querySelectorAll('input[type=number]')];
 stopInputs[0].value='1'; stopInputs[0].dispatchEvent(new w.Event('input'));
 stopInputs[1].value='2'; stopInputs[1].dispatchEvent(new w.Event('input'));
+assert.equal($('hours').checkValidity(), false, 'changed stop energy must block calculation until applied');
+const resumed = new Window({url:'https://example.test'});
+for(let i=0;i<w.localStorage.length;i++){const key=w.localStorage.key(i);resumed.localStorage.setItem(key,w.localStorage.getItem(key));}
+resumed.document.write(fs.readFileSync('web/ev-day.html','utf8').replace(/<script[^>]*><\/script>/g,''));
+for(const file of ['ev-day.js','ev-journey.js','ev-planner.js']) resumed.eval(fs.readFileSync('web/'+file,'utf8'));
+assert.equal(resumed.document.getElementById('hours').checkValidity(),false,'an unapplied stop edit must remain blocked after restart');
+await resumed.happyDOM.abort();
+
 stopInputs[2].value='0.5'; stopInputs[2].dispatchEvent(new w.Event('input'));
 stopInputs[3].value='1'; stopInputs[3].dispatchEvent(new w.Event('input'));
 $('apply-stop-energy').click();
@@ -68,6 +76,9 @@ assert.match(spoken.at(-1).text,/변경된 출발지/);
 $('route').value='서울역';
 $('parse-plan').click();
 $('apply-draft').click();
+assert.equal($('hours').checkValidity(), false, 'replacing stops invalidates applied stop energy');
+input('hours','0'); input('power','0');
+assert.equal($('hours').checkValidity(), true);
 input('origin','광화문');
 $('origin-search').click();
 await tick();
