@@ -65,19 +65,8 @@ jobs:
           grep -E 'PLEOS_CONSOLE_CHECK|uid=|Permission denied|Error|ERROR' /tmp/pleos-emulator.log | tail -60 || true
           tail -100 /tmp/pleos-emulator.log
           exit 1
-      - name: Install and capture actual Pleos screen
-        run: |
-          mkdir -p pleos-evidence
-          adb shell wm size > pleos-evidence/screen-size.txt
-          adb shell wm density > pleos-evidence/screen-density.txt
-          adb shell getprop > pleos-evidence/properties.txt
-          adb install -r 'apk/김재윤_하루전기_release.apk'
-          adb shell am start -W -n kr.mycabin.app/.MainActivity
-          sleep 30
-          adb shell uiautomator dump /sdcard/pleos-tree.xml
-          adb pull /sdcard/pleos-tree.xml pleos-evidence/tree.xml
-          adb exec-out screencap -p > pleos-evidence/screen.png
-          adb logcat -d > pleos-evidence/logcat.txt
+      - name: Verify launch and capture Pleos interaction evidence
+        run: python3 scripts/smoke_pleos.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
