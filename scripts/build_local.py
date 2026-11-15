@@ -25,7 +25,8 @@ def fetch(c):
    try:
     urllib.request.urlretrieve(base+rel,p)
     break
-   except Exception:
+   except Exception as exc:
+    print(f'Dependency download failed: {base+rel} ({type(exc).__name__}: {exc}); attempt {attempt+1}',file=sys.stderr,flush=True)
     if p.exists():p.unlink()
     if attempt==2:raise
     time.sleep(2**attempt)
