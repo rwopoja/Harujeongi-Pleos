@@ -21,7 +21,7 @@ def tap_visible(label):
  raise AssertionError('Visible button not found: '+label)
 adb('shell','wm','size','1920x1080');adb('shell','wm','density','160')
 adb('install','-r','apk/김재윤_하루전기_release.apk')
-adb('shell','am','start','-W','-n','kr.mycabin.app/.MainActivity')
+adb('shell','am','start','-W','-n','kr.harujeongi.app/.MainActivity')
 for i in range(18):
  time.sleep(4);root=tree()
  if '계획 계산하기' in ET.tostring(root,encoding='unicode'):break
@@ -36,7 +36,7 @@ assert 'Pleos 조회값' not in state, 'Unexpected vehicle reading on ordinary A
 shot('01-battery-unavailable')
 tap_visible('계획 계산하기')
 time.sleep(3);adb('shell','input','swipe','1000','880','1000','400','450');time.sleep(2);result=ET.tostring(tree(),encoding='unicode');(OUT/'result-tree.xml').write_text(result);shot('02-ev-result')
-assert '19.0 kWh' in result, 'Expected sample energy result not found'
+assert '18.0 kWh' in result, 'Expected sample energy result not found'
 tap_visible('내비 연결 및 일정 확인')
 time.sleep(3);navi=ET.tostring(tree(),encoding='unicode');shot('03-navi-unavailable')
 assert 'Pleos 내비 서비스가 없는 환경' in navi, 'Missing explicit navigation unavailable state on ordinary Android'

@@ -8,7 +8,7 @@ const spoken = [];
 const pushes = [];
 let reminder = null;
 let naviRequests = 0;
-w.CabinNative = {
+w.HaruNative = {
   listen(){},
   readBattery(){},
   speak(text, lang, id){ spoken.push({text, lang, id}); },
@@ -46,11 +46,21 @@ assert.match($('draft-status').textContent, /서울역 → 강남역 → 집/);
 assert.equal($('points').children.length, 0, 'speech never modifies the itinerary before confirmation');
 $('apply-draft').click();
 assert.equal($('points').children.length, 3);
+let stopInputs = [...$('points').querySelectorAll('input[type=number]')];
+stopInputs[0].value='1'; stopInputs[0].dispatchEvent(new w.Event('input'));
+stopInputs[1].value='2'; stopInputs[1].dispatchEvent(new w.Event('input'));
+stopInputs[2].value='0.5'; stopInputs[2].dispatchEvent(new w.Event('input'));
+stopInputs[3].value='1'; stopInputs[3].dispatchEvent(new w.Event('input'));
+$('apply-stop-energy').click();
+assert.equal(Number($('hours').value), 1.5);
+assert.equal(Number($('hours').value) * Number($('power').value), 2.5);
+assert.match($('stop-energy-status').textContent, /2.50 kWh/);
+
 assert.match($('route').value, /서울역 → 강남역 → 집/);
-w.dispatchEvent(new w.CustomEvent('cabin-voice',{detail:{text:'서울역 갔다가 집에 갈게'}}));
+w.dispatchEvent(new w.CustomEvent('haru-voice',{detail:{text:'서울역 갔다가 집에 갈게'}}));
 assert.match(spoken.at(-1).text,/서울역/);
 const priorRoute=$('route').value;
-w.dispatchEvent(new w.CustomEvent('cabin-voice',{detail:{text:'일정이 바뀌었어'}}));
+w.dispatchEvent(new w.CustomEvent('haru-voice',{detail:{text:'일정이 바뀌었어'}}));
 assert.equal($('route').value,priorRoute,'a change question must not replace a saved route');
 assert.match(spoken.at(-1).text,/변경된 출발지/);
 
@@ -107,8 +117,8 @@ $('route-search').click();
 call = calls.at(-1);
 input('origin','새 출발지');
 await respond(call,{code:'Ok',routes:[{distance:100000,legs:[{distance:100000}]}]});
-assert.equal($('distance').value,'5.6');
-assert.match($('result').innerText,/변경|kWh/);
+assert.equal($('distance').value,'', 'a changed itinerary must invalidate an automatically calculated distance');
+assert.match($('result').innerText,/변경/);
 // Restore a verified origin.
 $('origin-search').click();
 await respond(calls.at(-1),[{lat:'37.5663',lon:'126.978',display_name:'새 출발지'}]);

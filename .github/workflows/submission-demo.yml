@@ -43,10 +43,10 @@ jobs:
           python3 scripts/build_local.py
           sha256sum 'apk/김재윤_하루전기_release.apk'
       - name: Inspect EV battery SDK signatures
-        run: javap -classpath /tmp/mycabin-deps/Vehicle-2.3.2-unpacked/classes.jar ai.pleos.playground.vehicle.api.EvBattery
+        run: javap -classpath /tmp/harujeongi-deps/Vehicle-2.3.2-unpacked/classes.jar ai.pleos.playground.vehicle.api.EvBattery
       - name: Package reproducible local build tools
         run: |
-          tar -czf /tmp/ev-build-support.tgz -C "$ANDROID_HOME" build-tools/35.0.0 platforms/android-35/android.jar -C /tmp mycabin-deps -C "$GITHUB_WORKSPACE" app/src web scripts/build_local.py
+          tar -czf /tmp/ev-build-support.tgz -C "$ANDROID_HOME" build-tools/35.0.0 platforms/android-35/android.jar -C /tmp harujeongi-deps -C "$GITHUB_WORKSPACE" app/src web scripts/build_local.py
       - uses: actions/upload-artifact@v4
         with:
           name: ev-local-build-support
@@ -70,7 +70,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: MyCabin-signed-APK-and-Android-demo
+          name: Harujeongi-signed-APK-and-Android-demo
           path: |
             apk/김재윤_하루전기_release.apk
             runtime-artifacts/

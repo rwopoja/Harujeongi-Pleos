@@ -15,6 +15,21 @@
     "sha256": "a434930540cf4287598d694b1f26da9df686fa9dc697869ee15cf3671e2e78a8"
   },
   {
+    "coordinate": "ai.pleos.playground:NaviHelper:3.0.5",
+    "url": "https://nexus-playground.pleos.ai/repository/maven-releases/ai/pleos/playground/NaviHelper/3.0.5/NaviHelper-3.0.5.aar",
+    "sha256": "15fadd11c7c611b1abdf7ebf9ce91f2a6ce2728e60b4e38b4343e11bb9c12e97"
+  },
+  {
+    "coordinate": "ai.pleos.playground:navi-aidl:3.0.1",
+    "url": "https://nexus-playground.pleos.ai/repository/maven-releases/ai/pleos/playground/navi-aidl/3.0.1/navi-aidl-3.0.1.aar",
+    "sha256": "384e62b9b17102ce618272f4afbef5021867c04bd13e46a6592218643ceb40ff"
+  },
+  {
+    "coordinate": "ai.pleos.playground:navi-data:3.0.4",
+    "url": "https://nexus-playground.pleos.ai/repository/maven-releases/ai/pleos/playground/navi-data/3.0.4/navi-data-3.0.4.aar",
+    "sha256": "7ca00e592134b53237a48cc3b7864063ecc5e2885465e3ce9c8c2a29789a2e2b"
+  },
+  {
     "coordinate": "org.jetbrains.kotlin:kotlin-stdlib:1.9.25",
     "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/1.9.25/kotlin-stdlib-1.9.25.jar",
     "sha256": "f9cdcdbff1f5de85380ae526977e683726c2aa42db1ed6e6e50ae89e496e95fd"
@@ -28,6 +43,16 @@
     "coordinate": "org.jetbrains:annotations:23.0.0",
     "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/23.0.0/annotations-23.0.0.jar",
     "sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05"
+  },
+  {
+    "coordinate": "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.6.3",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.6.3/kotlinx-serialization-json-jvm-1.6.3.jar",
+    "sha256": "d3234179bcff1886d53d67c11eca47f7f3cf7b63c349d16965f6db51b7f3dd9a"
+  },
+  {
+    "coordinate": "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.6.3",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.6.3/kotlinx-serialization-core-jvm-1.6.3.jar",
+    "sha256": "29c821a8d4e25cbfe4f2ce96cdd4526f61f8f4e69a135f9612a34a81d93b65f1"
   },
   {
     "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.3",

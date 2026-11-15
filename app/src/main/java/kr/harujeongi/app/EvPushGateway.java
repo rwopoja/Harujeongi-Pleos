@@ -1,4 +1,4 @@
-package kr.mycabin.app;
+package kr.harujeongi.app;
 
 import android.webkit.WebView;
 import java.io.OutputStream;
@@ -29,7 +29,7 @@ final class EvPushGateway {
     HttpURLConnection c = (HttpURLConnection)new URL(path).openConnection();
     try {
      c.setConnectTimeout(8000); c.setReadTimeout(12000); c.setInstanceFollowRedirects(false);
-     c.setRequestProperty("User-Agent", "Harujeongi/0.1 (https://github.com/rwopoja/MyCabin-Pleos)");
+     c.setRequestProperty("User-Agent", "Harujeongi/0.1 (https://github.com/rwopoja/Harujeongi-Pleos)");
      if (action.equals("cancel")) {
       c.setRequestMethod("DELETE");
      } else {

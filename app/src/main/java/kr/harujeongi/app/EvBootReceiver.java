@@ -1,4 +1,4 @@
-package kr.mycabin.app;
+package kr.harujeongi.app;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;

@@ -2,13 +2,15 @@
 (() => {
   const $ = id => document.getElementById(id);
   const STORE = 'ev-planner-v2';
-  const emptyPoint = name => ({name: name || '', lat: null, lon: null, label: ''});
+  const emptyPoint = name => ({name: name || '', lat: null, lon: null, label: '', stopHours: 0, stopPower: 0});
   let plan;
   try { plan = JSON.parse(localStorage.getItem(STORE)); } catch (_) {}
   if (!plan || !plan.origin || !Array.isArray(plan.stops)) plan = {origin: emptyPoint(), stops: []};
   const clean = point => {
     if (!point || typeof point.name !== 'string') return emptyPoint();
     const cleanPoint = emptyPoint(point.name.slice(0, 150));
+    if (Number.isFinite(point.stopHours) && point.stopHours >= 0 && point.stopHours <= 24) cleanPoint.stopHours = point.stopHours;
+    if (Number.isFinite(point.stopPower) && point.stopPower >= 0 && point.stopPower <= 20) cleanPoint.stopPower = point.stopPower;
     if (Number.isFinite(point.lat) && Math.abs(point.lat) <= 90 && Number.isFinite(point.lon) && Math.abs(point.lon) <= 180 && typeof point.label === 'string') {
       cleanPoint.lat = point.lat; cleanPoint.lon = point.lon; cleanPoint.label = point.label.slice(0, 500);
     }
@@ -16,8 +18,13 @@
   };
   plan.origin = clean(plan.origin); plan.stops = plan.stops.slice(0, 8).map(clean);
   let draft = [], revision = 0, serial = 0;
+  let distanceFromRoute = false;
+  try {
+    distanceFromRoute = localStorage.getItem('ev-route-distance-derived-v1') === 'true';
+    if (localStorage.getItem('ev-route-distance-invalid-v1') === 'true') $('distance').value = '';
+  } catch (_) {}
   const pending = new Map();
-  let uxRestricted = !!window.CabinNative;
+  let uxRestricted = !!window.HaruNative;
   const uxDisabled = new WeakMap();
   const voiceAllowed = new Set(['start-voice','voice-route','speak-result']);
   function applyUx() {
@@ -47,6 +54,13 @@
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(plan)); } catch (_) { $('map-status').textContent = '계획을 기기에 저장하지 못했습니다.'; } };
   const changed = () => {
     revision++;
+    if (distanceFromRoute) {
+      $('distance').value = '';
+      $('charger-distance').value = '';
+      $('charger-name').value = '';
+      distanceFromRoute = false;
+      try { localStorage.removeItem('ev-route-distance-derived-v1'); localStorage.setItem('ev-route-distance-invalid-v1', 'true'); } catch (_) {}
+    }
     $('map-status').textContent = '장소가 바뀌었습니다. 장소를 확인하고 경로를 다시 계산해 주세요.';
     $('result').textContent = '일정이 변경됐습니다. 거리와 차량 정보를 확인하고 다시 계산해 주세요.';
     $('charge-result').textContent = '일정이 변경됐습니다. 충전 계획을 다시 계산해 주세요.';
@@ -76,14 +90,14 @@
     if (speak && draft.length) say('말씀하신 일정은 ' + draft.join(', 그리고 ') + '입니다. 화면에서 확인해 주세요.');
   }
   function say(text) {
-    if (!text || !window.CabinNative || !window.CabinNative.speak) {
+    if (!text || !window.HaruNative || !window.HaruNative.speak) {
       $('speak-status').textContent = '이 기기의 한국어 음성 출력 기능이 필요합니다.'; return;
     }
     $('speak-status').textContent = '음성 안내 요청 중';
-    window.CabinNative.speak(text, 'ko-KR', 'ev-day-result');
+    window.HaruNative.speak(text, 'ko-KR', 'ev-day-result');
   }
   $('speak-result').addEventListener('click', () => say($('result').innerText || $('result').textContent));
-  window.addEventListener('cabin-audio', e => {
+  window.addEventListener('haru-audio', e => {
     if (e.detail && e.detail.id === 'ev-day-result') $('speak-status').textContent = e.detail.error ? '한국어 음성 출력이 준비되지 않았습니다.' : '음성 안내 완료';
   });
   $('parse-plan').addEventListener('click', () => preview($('route').value, false));
@@ -97,7 +111,7 @@
       if (target) target.scrollIntoView({behavior:'smooth',block:'start'});
     });
   }
-  window.addEventListener('cabin-voice', e => {
+  window.addEventListener('haru-voice', e => {
     const heard = String(e.detail?.text || '').trim();
     if (!heard) return;
     $('voice-status').textContent = '인식: ' + heard;
@@ -144,12 +158,12 @@
 
   function request(payload) {
     if (!$('map-consent').checked) return Promise.reject(new Error('외부 지도 서비스 전송에 동의해 주세요.'));
-    if (!window.CabinNative || !window.CabinNative.mapRequest) return Promise.reject(new Error('설치형 앱의 지도 연결이 필요합니다.'));
+    if (!window.HaruNative || !window.HaruNative.mapRequest) return Promise.reject(new Error('설치형 앱의 지도 연결이 필요합니다.'));
     const id = String(Date.now() * 100 + (++serial % 100));
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { pending.delete(id); reject(new Error('응답 시간이 초과됐습니다.')); }, 45000);
       pending.set(id, {resolve, reject, timer});
-      try { window.CabinNative.mapRequest(id, JSON.stringify(payload)); }
+      try { window.HaruNative.mapRequest(id, JSON.stringify(payload)); }
       catch (_) { clearTimeout(timer); pending.delete(id); reject(new Error('지도 연결을 시작하지 못했습니다.')); }
     });
   }
@@ -195,7 +209,18 @@
       const search = button('이 장소 검색', () => searchPoint(point, results), 'sub');
       const remove = button('삭제', () => { plan.stops.splice(i, 1); changed(); render(); }, 'sub');
       const up = button('앞으로', () => { if (i > 0) { [plan.stops[i - 1], plan.stops[i]] = [plan.stops[i], plan.stops[i - 1]]; changed(); render(); } }, 'sub');
-      card.append(heading, input, search, up, remove, results); host.append(card);
+      const hours = document.createElement('input'); hours.type = 'number'; hours.min = '0'; hours.max = '24'; hours.step = 'any'; hours.value = point.stopHours; hours.setAttribute('aria-label', '목적지 ' + (i + 1) + ' 차량 전기 사용 시간');
+      const power = document.createElement('input'); power.type = 'number'; power.min = '0'; power.max = '20'; power.step = 'any'; power.value = point.stopPower; power.setAttribute('aria-label', '목적지 ' + (i + 1) + ' 정차 평균 소비전력');
+      const hoursLabel = document.createElement('label'); hoursLabel.textContent = '차량에서 전기를 쓰는 시간 (시간)'; hoursLabel.append(hours);
+      const powerLabel = document.createElement('label'); powerLabel.textContent = '그 시간의 평균 소비전력 (kW)'; powerLabel.append(power);
+      for (const [field, key] of [[hours, 'stopHours'], [power, 'stopPower']]) field.addEventListener('input', () => {
+        const value = field.value === '' ? null : Number(field.value);
+        point[key] = value; save();
+        $('stop-energy-status').textContent = '정차 계획이 변경됐습니다. 정차 에너지 적용 버튼을 다시 눌러 주세요.';
+        $('result').textContent = '정차 계획이 변경됐습니다. 정차 에너지를 적용하고 계획을 다시 계산해 주세요.';
+        $('charge-result').textContent = '정차 계획이 변경됐습니다. 정차 에너지를 적용하고 충전 계획을 다시 계산해 주세요.';
+      });
+      card.append(heading, input, search, up, remove, results, hoursLabel, powerLabel); host.append(card);
     });
     const anchor = $('charger-anchor'); anchor.replaceChildren();
     [plan.origin, ...plan.stops].forEach((p, i) => {
@@ -218,8 +243,27 @@
   }
   function applyDistance(km) {
     $('distance').value = km.toFixed(1);
+    distanceFromRoute = true;
+    try { localStorage.setItem('ev-route-distance-derived-v1', 'true'); localStorage.removeItem('ev-route-distance-invalid-v1'); } catch (_) {}
     $('form').dispatchEvent(new Event('submit', {cancelable:true, bubbles:true}));
   }
+  $('distance').addEventListener('input', () => {
+    distanceFromRoute = false;
+    try { localStorage.removeItem('ev-route-distance-derived-v1'); localStorage.removeItem('ev-route-distance-invalid-v1'); } catch (_) {}
+  });
+  $('apply-stop-energy').addEventListener('click', () => {
+    if (!plan.stops.length) { $('stop-energy-status').textContent = '목적지를 추가한 뒤 정차 계획을 입력해 주세요.'; return; }
+    if (plan.stops.some(p => !Number.isFinite(p.stopHours) || p.stopHours < 0 || p.stopHours > 24 || !Number.isFinite(p.stopPower) || p.stopPower < 0 || p.stopPower > 20)) {
+      $('stop-energy-status').textContent = '각 장소의 시간은 0~24시간, 소비전력은 0~20kW로 입력해 주세요.'; return;
+    }
+    const hours = plan.stops.reduce((sum, p) => sum + p.stopHours, 0);
+    if (hours > 24) { $('stop-energy-status').textContent = '전기 사용 시간의 합계는 24시간 이하여야 합니다.'; return; }
+    const energy = plan.stops.reduce((sum, p) => sum + p.stopHours * p.stopPower, 0);
+    $('hours').value = String(hours); $('power').value = String(hours ? energy / hours : 0);
+    $('hours').dispatchEvent(new Event('input', {bubbles:true}));
+    $('power').dispatchEvent(new Event('input', {bubbles:true}));
+    $('stop-energy-status').textContent = '정차 전력 합계 ' + energy.toFixed(2) + ' kWh를 계획 입력값에 반영했습니다. 계획 계산하기를 눌러 주세요.';
+  });
   $('route-search').addEventListener('click', async () => {
     const at = revision; $('map-status').textContent = '선택한 장소로 도로 경로를 계산하고 있습니다…';
     try {
@@ -237,11 +281,11 @@
   }
   let naviLocation = null;
   $('connect-navi').addEventListener('click', () => {
-    if (!window.CabinNative || !window.CabinNative.observeNavi) {
+    if (!window.HaruNative || !window.HaruNative.observeNavi) {
       $('navi-status').textContent = 'Pleos 설치형 앱에서 사용할 수 있습니다.'; return;
     }
     $('navi-status').textContent = 'Pleos 내비 연결 요청 중…';
-    window.CabinNative.observeNavi();
+    window.HaruNative.observeNavi();
   });
   window.addEventListener('ev-navi', event => {
     const data = event.detail || {}, value = data.value;
@@ -374,20 +418,20 @@
     $('eff-suggestion').textContent = '참고 전비 ' + median.toFixed(1) + ' km/kWh를 적용했습니다. 이번 조건에 적절한지 확인한 뒤 다시 계산하세요.';
   });
   $('export-history').addEventListener('click', () => {
-    if (!window.CabinNative || !window.CabinNative.exportData) { $('eff-suggestion').textContent = '설치형 앱에서 기록을 내보낼 수 있습니다.'; return; }
+    if (!window.HaruNative || !window.HaruNative.exportData) { $('eff-suggestion').textContent = '설치형 앱에서 기록을 내보낼 수 있습니다.'; return; }
     let rows = [];
     try { rows = JSON.parse(localStorage.getItem('ev-day-history-v1') || '[]'); } catch (_) {}
-    window.CabinNative.exportData(JSON.stringify({version:1,history:Array.isArray(rows)?rows:[]}));
+    window.HaruNative.exportData(JSON.stringify({version:1,history:Array.isArray(rows)?rows:[]}));
     $('eff-suggestion').textContent = '공유할 앱을 선택하세요. 경유지 등 개인 정보가 포함됩니다.';
   });
   $('reminder-set').addEventListener('click', () => {
-    if (!window.CabinNative || !window.CabinNative.setReminder) { $('reminder-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
+    if (!window.HaruNative || !window.HaruNative.setReminder) { $('reminder-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
     $('reminder-status').textContent = '알림을 예약하고 있습니다…';
-    window.CabinNative.setReminder(Number($('reminder-minutes').value));
+    window.HaruNative.setReminder(Number($('reminder-minutes').value));
   });
   $('reminder-cancel').addEventListener('click', () => {
-    if (!window.CabinNative || !window.CabinNative.cancelReminder) { $('reminder-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
-    window.CabinNative.cancelReminder();
+    if (!window.HaruNative || !window.HaruNative.cancelReminder) { $('reminder-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
+    window.HaruNative.cancelReminder();
   });
   window.addEventListener('ev-reminder', e => { $('reminder-status').textContent = String(e.detail || ''); });
   let pushPrefs = {};
@@ -420,7 +464,7 @@
     const topic = $('push-topic').value;
     if (!$('push-consent').checked) { $('push-status').textContent = '알림 서비스 전송에 동의해 주세요.'; return; }
     if (!/^harujeongi-[a-f0-9]{48}$/.test(topic)) { $('push-status').textContent = '먼저 연결 코드를 만들어 주세요.'; return; }
-    if (!window.CabinNative || !window.CabinNative.pushRequest) { $('push-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
+    if (!window.HaruNative || !window.HaruNative.pushRequest) { $('push-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
     const id = String(Date.now()*100+(++pushSerial%100));
     pushPending.set(id, action);
     if (action === 'schedule') { try { localStorage.setItem('ev-push-pending-v1','1'); } catch (_) {} }
@@ -428,7 +472,7 @@
       if (pushPending.delete(id)) $('push-status').textContent = '응답 시간이 초과됐습니다. 서버 예약 여부를 확인하거나 취소를 요청하세요.';
     }, 30000);
     $('push-status').textContent = '알림 서버에 요청 중…';
-    try { window.CabinNative.pushRequest(id, JSON.stringify({action,topic,minutes:Number($('push-minutes').value),low})); }
+    try { window.HaruNative.pushRequest(id, JSON.stringify({action,topic,minutes:Number($('push-minutes').value),low})); }
     catch (_) { pushPending.delete(id); $('push-status').textContent = '알림 요청을 시작하지 못했습니다.'; }
   }
   window.addEventListener('ev-push', e => {

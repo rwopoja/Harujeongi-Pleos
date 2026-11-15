@@ -1,4 +1,4 @@
-package kr.mycabin.app;
+package kr.harujeongi.app;
 
 import android.Manifest;
 import android.app.Activity;
@@ -19,7 +19,7 @@ public final class VoiceGateway implements RecognitionListener {
  private SpeechRecognizer recognizer;
  private boolean listening;
  public VoiceGateway(Activity activity, WebView web){this.activity=activity;this.web=web;}
- private void emit(String key,String value){try{JSONObject data=new JSONObject().put(key,value);web.evaluateJavascript("window.dispatchEvent(new CustomEvent('cabin-voice',{detail:"+data+"}))",null);}catch(Exception ignored){}}
+ private void emit(String key,String value){try{JSONObject data=new JSONObject().put(key,value);web.evaluateJavascript("window.dispatchEvent(new CustomEvent('haru-voice',{detail:"+data+"}))",null);}catch(Exception ignored){}}
  public void listen(){
   if(listening)return;
   if(activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){activity.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},41);return;}

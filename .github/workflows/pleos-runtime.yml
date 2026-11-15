@@ -45,14 +45,14 @@ jobs:
           if len(matches)!=1: raise SystemExit('Expected exactly one system.img; found '+str(matches))
           image_dir=matches[0].parent
           avd=pathlib.Path.home()/'.android/avd';avd.mkdir(parents=True,exist_ok=True)
-          d=avd/'MyCabin_Pleos.avd';d.mkdir(exist_ok=True)
-          (avd/'MyCabin_Pleos.ini').write_text('avd.ini.encoding=UTF-8\npath='+str(d)+'\ntarget=android-34\n')
-          (d/'config.ini').write_text('AvdId=MyCabin_Pleos\nabi.type=x86_64\nimage.sysdir.1='+str(image_dir)+'/\nhw.cpu.arch=x86_64\nhw.cpu.ncore=4\nhw.ramSize=4096\nhw.lcd.width=1920\nhw.lcd.height=1080\nhw.lcd.density=160\nhw.gpu.enabled=yes\nhw.gpu.mode=swiftshader_indirect\ndisk.dataPartition.size=4096M\n')
+          d=avd/'Harujeongi_Pleos.avd';d.mkdir(exist_ok=True)
+          (avd/'Harujeongi_Pleos.ini').write_text('avd.ini.encoding=UTF-8\npath='+str(d)+'\ntarget=android-34\n')
+          (d/'config.ini').write_text('AvdId=Harujeongi_Pleos\nabi.type=x86_64\nimage.sysdir.1='+str(image_dir)+'/\nhw.cpu.arch=x86_64\nhw.cpu.ncore=4\nhw.ramSize=4096\nhw.lcd.width=1920\nhw.lcd.height=1080\nhw.lcd.density=160\nhw.gpu.enabled=yes\nhw.gpu.mode=swiftshader_indirect\ndisk.dataPartition.size=4096M\n')
           PY
           adb start-server
           mkfifo /tmp/pleos-serial
           exec 8<>/tmp/pleos-serial
-          nohup "$ANDROID_HOME/emulator/emulator" -avd MyCabin_Pleos -no-window -no-audio -gpu swiftshader_indirect -no-snapshot -no-boot-anim -shell < /tmp/pleos-serial > /tmp/pleos-emulator.log 2>&1 &
+          nohup "$ANDROID_HOME/emulator/emulator" -avd Harujeongi_Pleos -no-window -no-audio -gpu swiftshader_indirect -no-snapshot -no-boot-anim -shell < /tmp/pleos-serial > /tmp/pleos-emulator.log 2>&1 &
           for i in $(seq 1 72); do
             if [ -s "$HOME/.android/adbkey.pub" ] && [ $((i % 18)) -eq 1 ]; then
               printf 'echo PLEOS_CONSOLE_CHECK; id; mkdir -p /data/misc/adb; echo "%s" >> /data/misc/adb/adb_keys; chmod 640 /data/misc/adb/adb_keys; setprop ctl.restart adbd\n' "$(cat "$HOME/.android/adbkey.pub")" >&8

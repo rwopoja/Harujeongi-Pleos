@@ -1,4 +1,4 @@
-package kr.mycabin.app;
+package kr.harujeongi.app;
 
 import android.app.AlarmManager;
 import android.app.NotificationChannel;
