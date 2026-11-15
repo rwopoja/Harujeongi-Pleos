@@ -8,6 +8,7 @@ on:
       - 'app/**'
       - 'scripts/build_local.py'
       - 'scripts/smoke_android.py'
+      - 'scripts/smoke_android_map.py'
 permissions:
   contents: read
 jobs:
