@@ -20,6 +20,17 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify EV planning and stale-response handling
+        run: |
+          npm ci
+          node tests/ev-journey-smoke.mjs
+          node tests/ev-planner.test.mjs
+      - name: Check public map service response formats
+        continue-on-error: true
+        run: python3 scripts/test_open_services.py
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
