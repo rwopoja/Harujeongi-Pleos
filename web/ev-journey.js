@@ -25,6 +25,15 @@
  el('resume-current').addEventListener('click',()=>{if(!route)return;route.updatedAt=Date.now();write(routeKey,route);refreshResume();});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshResume();});
  setInterval(refreshResume,60000);
+ function showPredictionForHistory(){
+  const p=read('ev-day-last-prediction-v1',null),v=p&&p.inputs;
+  if(!p||!Number.isFinite(p.raw)||!v||!Number.isFinite(v.distance)){el('history-prediction-status').textContent='저장된 예측이 없습니다. 먼저 계획을 계산하세요.';return;}
+  const name=typeof p.route==='string'?p.route:'미입력';
+  el('history-prediction-status').textContent='기록할 마지막 예측: '+name+' · 거리 '+v.distance.toFixed(1)+' km · 예상 '+p.raw.toFixed(1)+'%'+(p.charge?' · 충전 계획 포함':' · 충전 계획 없음')+'. 아래 실제 잔량이 이 예측에 해당하는지 확인하세요.';
+ }
+ el('form').addEventListener('submit',showPredictionForHistory);
+ el('clear').addEventListener('click',showPredictionForHistory);
+ showPredictionForHistory();
  function showHistory(){const host=el('history');host.replaceChildren();if(historyLocked){const warning=document.createElement('p');warning.textContent='일부 기록을 읽을 수 없어 원본을 보호 중입니다. 기록 내보내기로 원본을 보관한 뒤 필요하면 기록 전체 삭제를 선택하세요.';host.append(warning);}if(!history.length){if(!historyLocked)host.textContent='저장된 기록이 없습니다.';return;}for(const item of history.slice().reverse()){const row=document.createElement('p');const routeLine=document.createElement('small');row.textContent=`${item.date} · 예상 ${item.predicted.toFixed(1)}% · 실제 ${item.actual.toFixed(1)}% · 오차 ${(item.actual-item.predicted).toFixed(1)}%p`;routeLine.textContent='경유: '+item.route;row.append(document.createElement('br'),routeLine);if(item.noCharge&&item.inputs&&Number.isFinite(item.inputs.soc)&&Number.isFinite(item.inputs.cap)&&Number.isFinite(item.inputs.distance)){const use=(item.inputs.soc-item.actual)*item.inputs.cap/100;const detail=document.createElement('small');detail.textContent='이동 '+item.inputs.distance.toFixed(1)+' km · 잔량 변화 기준 소비 '+(use>=0?use.toFixed(1)+' kWh':'확인 불가');row.append(document.createElement('br'),detail);}host.append(row);}}
  el('voice-route').onclick=()=>{if(window.HaruNative&&window.HaruNative.listen){el('voice-status').textContent='기기의 음성 인식 준비 중';window.HaruNative.listen();}else el('voice-status').textContent='설치형 앱과 기기의 음성 인식 서비스가 필요합니다.';};
  window.addEventListener('haru-voice',event=>{const r=event.detail||{};if(r.status||r.error)el('voice-status').textContent=r.status||r.error;});
