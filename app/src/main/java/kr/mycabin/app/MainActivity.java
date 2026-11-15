@@ -22,6 +22,8 @@ public final class MainActivity extends Activity {
  private VoiceGateway voice;
  private AiGateway ai;
  private EvMapGateway map;
+ private PleosNaviGateway navi;
+ private CarUxGateway ux;
  private int pendingReminderMinutes;
  private static final String ORIGIN = "https://appassets.androidplatform.net/assets/";
 
@@ -47,7 +49,10 @@ public final class MainActivity extends Activity {
   voice=new VoiceGateway(this,web);
   ai=new AiGateway(web);
   map=new EvMapGateway(web);
+  navi=new PleosNaviGateway(this,web);
+  ux=new CarUxGateway(this,web);
   web.setWebViewClient(new WebViewClient(){
+   @Override public void onPageFinished(WebView view,String url){if(ux!=null)ux.start();}
    @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request){
     String url=request.getUrl().toString();
     if(!url.startsWith(ORIGIN))return blocked();
@@ -89,13 +94,14 @@ public final class MainActivity extends Activity {
   @JavascriptInterface public void openVideo(String url){if(url==null||url.length()>2000)return;runOnUiThread(()->{try{android.net.Uri uri=android.net.Uri.parse(url);String host=uri.getHost();if(!"https".equals(uri.getScheme())||!("youtube.com".equals(host)||"www.youtube.com".equals(host)||"m.youtube.com".equals(host)||"youtu.be".equals(host)))return;if(!pleos.verifiedParked()){notifyMessage("실제 주차 상태를 확인한 뒤 다시 열어 주세요.");return;}startActivity(new Intent(Intent.ACTION_VIEW,uri));}catch(Exception ignored){notifyMessage("영상을 열 수 있는 앱이 없습니다.");}});}
   @JavascriptInterface public void listen(){runOnUiThread(()->voice.listen());}
   @JavascriptInterface public void mapRequest(String id,String request){if(map!=null)map.request(id,request);}
+  @JavascriptInterface public void observeNavi(){runOnUiThread(()->navi.start());}
   @JavascriptInterface public void setReminder(int minutes){runOnUiThread(()->MainActivity.this.setReminder(minutes));}
   @JavascriptInterface public void cancelReminder(){runOnUiThread(()->{EvReminderReceiver.cancel(MainActivity.this);reminderMessage("예약한 알림을 취소했습니다.");});}
   @JavascriptInterface public void readBattery(String id){if(id==null||!id.matches("[0-9]{1,16}"))return;runOnUiThread(()->pleos.readBattery(id));}
   @JavascriptInterface public void inspectVehicle(){runOnUiThread(()->{if(checkSelfPermission("android.car.permission.CAR_SPEED")!=android.content.pm.PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.car.permission.CAR_SPEED","android.car.permission.CAR_POWERTRAIN"},42);else pleos.inspect();});}
   @JavascriptInterface public void applySeat(String json){if(json!=null&&json.length()<10000)runOnUiThread(()->pleos.applySeat(json));}
   @JavascriptInterface public void applyVehicle(String json){if(json!=null&&json.length()<10000)runOnUiThread(()->pleos.apply(json));}
-  @JavascriptInterface public void exportData(String json){if(json==null||json.length()>2000000)return;runOnUiThread(()->{Intent share=new Intent(Intent.ACTION_SEND);share.setType("text/plain");share.putExtra(Intent.EXTRA_TEXT,json);startActivity(Intent.createChooser(share,"마이씬 내보내기"));});}
+  @JavascriptInterface public void exportData(String json){if(json==null||json.length()>2000000)return;runOnUiThread(()->{Intent share=new Intent(Intent.ACTION_SEND);share.setType("text/plain");share.putExtra(Intent.EXTRA_TEXT,json);startActivity(Intent.createChooser(share,"하루전기 기록 내보내기"));});}
  }
  @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);if(request==41&&voice!=null)voice.onPermission(results.length>0&&results[0]==android.content.pm.PackageManager.PERMISSION_GRANTED);if(request==42&&pleos!=null)pleos.inspect();if(request==43){int minutes=pendingReminderMinutes;pendingReminderMinutes=0;if(results.length>0&&results[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)setReminder(minutes);else reminderMessage("알림 권한이 없어 예약하지 못했습니다.");}}
  @Override public void onConfigurationChanged(android.content.res.Configuration config){
@@ -107,5 +113,5 @@ public final class MainActivity extends Activity {
  @Override public void onBackPressed(){web.evaluateJavascript("window.CabinApp && window.CabinApp.back()",null);}
  @Override protected void onPause(){super.onPause();if(tts!=null)tts.stop();if(voice!=null)voice.cancel();web.evaluateJavascript("window.dispatchEvent(new Event('pagehide'))",null);web.onPause();}
  @Override protected void onResume(){super.onResume();if(web!=null)web.onResume();}
- @Override protected void onDestroy(){if(map!=null)map.release();if(voice!=null)voice.release();if(pleos!=null)pleos.release();if(tts!=null)tts.shutdown();if(web!=null){web.removeJavascriptInterface("CabinNative");web.destroy();}super.onDestroy();}
+ @Override protected void onDestroy(){if(ux!=null)ux.release();if(navi!=null)navi.release();if(map!=null)map.release();if(voice!=null)voice.release();if(pleos!=null)pleos.release();if(tts!=null)tts.shutdown();if(web!=null){web.removeJavascriptInterface("CabinNative");web.destroy();}super.onDestroy();}
 }

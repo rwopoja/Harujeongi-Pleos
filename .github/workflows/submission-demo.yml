@@ -39,9 +39,9 @@ jobs:
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Build and verify signed demo APK
         run: |
-          rm -f 'apk/김재윤_마이캐빈_release.apk'
+          rm -f 'apk/김재윤_하루전기_release.apk'
           python3 scripts/build_local.py
-          sha256sum 'apk/김재윤_마이캐빈_release.apk'
+          sha256sum 'apk/김재윤_하루전기_release.apk'
       - name: Inspect EV battery SDK signatures
         run: javap -classpath /tmp/mycabin-deps/Vehicle-2.3.2-unpacked/classes.jar ai.pleos.playground.vehicle.api.EvBattery
       - name: Enable KVM
@@ -64,7 +64,7 @@ jobs:
         with:
           name: MyCabin-signed-APK-and-Android-demo
           path: |
-            apk/김재윤_마이캐빈_release.apk
+            apk/김재윤_하루전기_release.apk
             runtime-artifacts/
           if-no-files-found: error
   pleos-image-availability:

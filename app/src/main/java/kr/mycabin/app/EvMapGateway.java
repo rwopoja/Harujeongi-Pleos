@@ -54,7 +54,9 @@ final class EvMapGateway {
      validate(lat, lon);
      String around = String.format(Locale.US, "(around:4000,%.6f,%.6f)", lat, lon);
      String q = "[out:json][timeout:15];(node[amenity=charging_station]" + around + ";way[amenity=charging_station]" + around + ";relation[amenity=charging_station]" + around + ";);out center tags 50;";
-     body = get("https://overpass-api.de/api/interpreter", "data=" + URLEncoder.encode(q, "UTF-8"));
+     String encoded = URLEncoder.encode(q, "UTF-8");
+     try { body = get("https://overpass.kumi.systems/api/interpreter?data=" + encoded, null); }
+     catch (Exception first) { body = get("https://overpass-api.de/api/interpreter?data=" + encoded, null); }
      emit(id, new JSONObject().put("ok", true).put("data", new JSONObject(body)));
     } else throw new IllegalArgumentException("지원하지 않는 요청입니다.");
    } catch (Exception e) {
@@ -71,7 +73,7 @@ final class EvMapGateway {
  private static String get(String address, String form) throws Exception {
   HttpURLConnection c = (HttpURLConnection)new URL(address).openConnection();
   try {
-   c.setConnectTimeout(12000); c.setReadTimeout(20000); c.setInstanceFollowRedirects(false);
+   c.setConnectTimeout(6000); c.setReadTimeout(12000); c.setInstanceFollowRedirects(false);
    c.setRequestProperty("User-Agent", "Harujeongi/0.1 (https://github.com/rwopoja/MyCabin-Pleos)");
    c.setRequestProperty("Accept", "application/json");
    if (form != null) {

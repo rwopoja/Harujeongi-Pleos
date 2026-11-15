@@ -10,7 +10,9 @@ BUILD=ROOT/'app/build/manual';BUILD.mkdir(parents=True,exist_ok=True)
 CACHE=pathlib.Path(os.environ.get('MYCABIN_DEPS','/tmp/mycabin-deps'));CACHE.mkdir(exist_ok=True)
 COORDS=[
  ('ai.pleos.playground','Vehicle','2.3.2','aar'),('ai.pleos.playground','vehicle-aidl','1.1.1','aar'),('ai.pleos.playground','vehicle-data','1.1.11','aar'),
+ ('ai.pleos.playground','NaviHelper','3.0.5','aar'),('ai.pleos.playground','navi-aidl','3.0.1','aar'),('ai.pleos.playground','navi-data','3.0.4','aar'),
  ('org.jetbrains.kotlin','kotlin-stdlib','1.9.25','jar'),('org.jetbrains.kotlin','kotlin-reflect','1.9.25','jar'),('org.jetbrains','annotations','23.0.0','jar'),
+ ('org.jetbrains.kotlinx','kotlinx-serialization-json-jvm','1.6.3','jar'),('org.jetbrains.kotlinx','kotlinx-serialization-core-jvm','1.6.3','jar'),
  ('org.jetbrains.kotlinx','kotlinx-coroutines-core-jvm','1.6.3','jar'),('org.jetbrains.kotlinx','kotlinx-coroutines-android','1.6.3','jar'),('com.google.code.gson','gson','2.10.1','jar'),
  ('androidx.core','core-ktx','1.8.0','aar'),('androidx.core','core','1.8.0','aar'),('androidx.annotation','annotation','1.2.0','jar'),
  ('androidx.collection','collection','1.0.0','jar'),('androidx.concurrent','concurrent-futures','1.0.0','jar'),('androidx.lifecycle','lifecycle-runtime','2.3.1','aar'),
@@ -65,7 +67,7 @@ aligned=BUILD/'aligned.apk';run([TOOLS/'zipalign','-f','4',unsigned,aligned])
 keystore=pathlib.Path(os.environ.get('MYCABIN_KEYSTORE','/tmp/mycabin-contest-signing.jks'))
 password=os.environ.get('MYCABIN_KEYSTORE_PASSWORD','mycabin-local-build')
 if not keystore.exists():run([JDK/'bin/keytool','-genkeypair','-keystore',keystore,'-alias','mycabin','-keyalg','RSA','-keysize','2048','-validity','3650','-storepass',password,'-keypass',password,'-dname','CN=MyCabin Contest'])
-out=ROOT/'apk/김재윤_마이캐빈_release.apk'
+out=ROOT/'apk/김재윤_하루전기_release.apk'
 env=os.environ.copy();env['CABIN_SIGN_PASS']=password
 subprocess.run([str(TOOLS/'apksigner'),'sign','--ks',str(keystore),'--ks-key-alias','mycabin','--ks-pass','env:CABIN_SIGN_PASS','--key-pass','env:CABIN_SIGN_PASS','--out',str(out),str(aligned)],check=True,env=env)
 run([TOOLS/'apksigner','verify','--verbose',out]);print('APK:',out,flush=True)

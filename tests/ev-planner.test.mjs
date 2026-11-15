@@ -6,16 +6,19 @@ const w = new Window({url:'https://example.test'});
 const calls = [];
 const spoken = [];
 let reminder = null;
+let naviRequests = 0;
 w.CabinNative = {
   listen(){},
   readBattery(){},
   speak(text, lang, id){ spoken.push({text, lang, id}); },
   setReminder(minutes){ reminder = minutes; },
   cancelReminder(){ reminder = null; },
+  observeNavi(){ naviRequests++; },
   mapRequest(id, json){ calls.push({id, request:JSON.parse(json)}); }
 };
 w.document.write(fs.readFileSync('web/ev-day.html','utf8').replace(/<script[^>]*><\/script>/g,''));
 for (const file of ['ev-day.js','ev-journey.js','ev-planner.js']) w.eval(fs.readFileSync('web/'+file,'utf8'));
+w.dispatchEvent(new w.CustomEvent('ev-ux',{detail:{state:'phone',restricted:false}}));
 const $ = id => w.document.getElementById(id);
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 const input = (id, value) => { $(id).value = value; $(id).dispatchEvent(new w.Event('input', {bubbles:true})); };
@@ -24,6 +27,15 @@ const respond = async (call, data) => {
   await tick();
 };
 const option = (host, prefix) => [...host.querySelectorAll('button')].find(x => x.textContent.startsWith(prefix));
+
+w.dispatchEvent(new w.CustomEvent('ev-ux',{detail:{state:'vehicle',restricted:true}}));
+assert.equal($('route-search').disabled,true);
+assert.equal($('origin').disabled,true);
+assert.equal($('voice-route').disabled,false);
+w.dispatchEvent(new w.CustomEvent('ev-ux',{detail:{state:'unknown',restricted:true}}));
+assert.match($('ux-status').textContent,/확인할 수 없어/);
+w.dispatchEvent(new w.CustomEvent('ev-ux',{detail:{state:'vehicle',restricted:false}}));
+assert.equal($('route-search').disabled,false);
 
 assert.deepEqual([...w.EvPlanner.parseStops('오늘 서울역에 갔다가 강남역 들르고 집에 갈 거야')], ['서울역','강남역','집']);
 $('route').value = '오늘 서울역에 갔다가 강남역 들르고 집에 갈 거야';
@@ -66,6 +78,14 @@ option(card,'이 장소 검색').click();
 await respond(calls.at(-1),[{lat:'37.5547',lon:'126.9707',display_name:'서울역, 서울'}]);
 card = $('points').firstElementChild;
 option(card,'서울역').click();
+$('connect-navi').click();
+assert.equal(naviRequests,1);
+w.dispatchEvent(new w.CustomEvent('ev-navi',{detail:{event:'destination',value:{name:'다른 곳',lat:37.50,lon:127.03}}}));
+assert.match($('navi-status').textContent,/일정이 바뀌었나요/);
+assert.equal($('navi-change').hidden,false);
+w.dispatchEvent(new w.CustomEvent('ev-navi',{detail:{event:'destination',value:{name:'서울역',lat:37.5547,lon:126.9707}}}));
+assert.match($('navi-status').textContent,/일치/);
+assert.equal($('navi-change').hidden,true);
 
 $('route-search').click();
 let call = calls.at(-1);

@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
  <uses-permission android:name="android.permission.INTERNET"/>
  <uses-permission android:name="pleos.car.permission.CAR_ENERGY"/>
+ <uses-permission android:name="pleos.car.permission.NAVI_ROUTE"/>
  <uses-permission android:name="pleos.car.permission.CAR_CLIMATE"/>
  <uses-permission android:name="pleos.car.permission.CONTROL_CAR_CLIMATE"/>
  <uses-permission android:name="pleos.car.permission.CAR_LIGHTS"/>
@@ -14,9 +15,13 @@
  <uses-permission android:name="pleos.car.permission.CAR_SEATS"/>
  <uses-permission android:name="pleos.car.permission.CONTROL_CAR_SEATS"/>
  <uses-permission android:name="ai.pleos.playground.service.vehicle.VEHICLE_BINDING"/>
- <queries><intent><action android:name="ai.pleos.playground.vehicle.VEHICLE_START"/></intent><intent><action android:name="android.speech.RecognitionService"/></intent></queries>
+ <queries><intent><action android:name="ai.pleos.playground.vehicle.VEHICLE_START"/></intent><intent><action android:name="ai.pleos.playground.intent.action.NAVI_START"/></intent><intent><action android:name="android.speech.RecognitionService"/></intent></queries>
  <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
  <application android:label="하루전기 시험판" android:icon="@drawable/ic_cabin" android:theme="@style/AppTheme" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true">
+  <meta-data android:name="ai.pleos.playground.service.navi.helper.min_version_name" android:value="2.0.1"/>
+  <meta-data android:name="ai.pleos.playground.service.navi.helper.min_version_code" android:value="11"/>
+  <meta-data android:name="ai.pleos.playground.sdk.navi.helper.current_version_name" android:value="3.0.5"/>
+  <meta-data android:name="ai.pleos.playground.sdk.navi.helper.current_version_code" android:value="75"/>
   <receiver android:name=".EvReminderReceiver" android:exported="false"/>
   <receiver android:name=".EvBootReceiver" android:exported="true">
    <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/></intent-filter>

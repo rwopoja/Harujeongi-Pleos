@@ -9,4 +9,7 @@ android {
 }
 tasks.register('syncWeb', Copy) { from('../web') { exclude 'assets/pleos-reference.png', 'assets/pleos-library.png' }; into('src/main/assets') }
 tasks.named('preBuild').configure { dependsOn 'syncWeb' }
-dependencies { implementation 'ai.pleos.playground:Vehicle:2.3.2' }
+dependencies {
+ implementation 'ai.pleos.playground:Vehicle:2.3.2'
+ implementation 'ai.pleos.playground:NaviHelper:3.0.5'
+}

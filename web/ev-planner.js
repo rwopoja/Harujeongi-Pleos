@@ -17,6 +17,33 @@
   plan.origin = clean(plan.origin); plan.stops = plan.stops.slice(0, 8).map(clean);
   let draft = [], revision = 0, serial = 0;
   const pending = new Map();
+  let uxRestricted = !!window.CabinNative;
+  const uxDisabled = new WeakMap();
+  const voiceAllowed = new Set(['start-voice','voice-route','speak-result']);
+  function applyUx() {
+    for (const control of document.querySelectorAll('button,input,select,textarea')) {
+      if (voiceAllowed.has(control.id)) continue;
+      if (uxRestricted) {
+        if (!uxDisabled.has(control)) uxDisabled.set(control, control.disabled);
+        control.disabled = true;
+      } else if (uxDisabled.has(control)) {
+        control.disabled = uxDisabled.get(control); uxDisabled.delete(control);
+      }
+    }
+  }
+  window.addEventListener('ev-ux', event => {
+    const d = event.detail || {};
+    uxRestricted = d.restricted !== false;
+    $('ux-status').textContent = d.state === 'phone'
+      ? '일반 Android 기기 시험 화면 · 차량 주행 상태는 확인하지 않습니다.'
+      : d.state === 'unknown'
+        ? '차량 주행 제한 상태를 확인할 수 없어 입력과 검색을 잠갔습니다.'
+        : uxRestricted ? '차량의 주행 제한이 적용되어 입력과 검색을 잠갔습니다. 음성 안내를 이용하세요.'
+        : '차량에서 입력 제한이 없는 상태로 확인됐습니다.';
+    applyUx();
+  });
+  const uxObserver = new MutationObserver(() => { if (uxRestricted) applyUx(); });
+  uxObserver.observe(document.body, {childList:true,subtree:true});
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(plan)); } catch (_) { $('map-status').textContent = '계획을 기기에 저장하지 못했습니다.'; } };
   const changed = () => {
     revision++;
@@ -195,6 +222,39 @@
     const h = Math.sin(dlat/2)**2 + Math.cos(radians(a.lat))*Math.cos(radians(b.lat))*Math.sin(dlon/2)**2;
     return 12742 * Math.asin(Math.min(1, Math.sqrt(h)));
   }
+  $('connect-navi').addEventListener('click', () => {
+    if (!window.CabinNative || !window.CabinNative.observeNavi) {
+      $('navi-status').textContent = 'Pleos 설치형 앱에서 사용할 수 있습니다.'; return;
+    }
+    $('navi-status').textContent = 'Pleos 내비 연결 요청 중…';
+    window.CabinNative.observeNavi();
+  });
+  window.addEventListener('ev-navi', event => {
+    const data = event.detail || {}, value = data.value;
+    if (data.event === 'destination' && value && Number.isFinite(value.lat) && Number.isFinite(value.lon)) {
+      const expected = plan.stops.at(-1);
+      if (coordinate(expected) && straightDistance(expected, value) > 0.5) {
+        $('navi-status').textContent = '내비 목적지 ' + String(value.name || '목적지') + '가 저장된 마지막 장소와 다릅니다. 일정이 바뀌었나요?';
+        $('navi-change').hidden = false; $('navi-keep').hidden = false;
+      } else {
+        $('navi-status').textContent = '내비 목적지: ' + String(value.name || '이름 없음') + (coordinate(expected) ? ' · 저장한 마지막 장소와 일치' : ' · 저장한 마지막 장소를 확인해 주세요.');
+        $('navi-change').hidden = true; $('navi-keep').hidden = true;
+      }
+    } else if (data.event === 'waypoint_changed') {
+      $('navi-status').textContent = '내비 경유지가 변경됐습니다. 저장한 일정도 바뀌었나요?';
+      $('navi-change').hidden = false; $('navi-keep').hidden = false;
+    } else if (data.event === 'error' || data.event === 'status' || data.event === 'changed') {
+      $('navi-status').textContent = String(value || '내비 상태를 확인해 주세요.');
+    }
+  });
+  $('navi-change').addEventListener('click', () => {
+    $('navi-change').hidden = true; $('navi-keep').hidden = true;
+    $('voice-route').click(); $('voice-status').scrollIntoView({behavior:'smooth',block:'center'});
+  });
+  $('navi-keep').addEventListener('click', () => {
+    $('navi-change').hidden = true; $('navi-keep').hidden = true;
+    $('navi-status').textContent = '저장한 일정을 유지합니다. 현재 위치와 남은 거리를 확인해 주세요.';
+  });
   $('find-chargers').addEventListener('click', async () => {
     const at = revision, host = $('charger-list'), index = Number($('charger-anchor').value);
     host.textContent = '공개 지도에서 주변 충전소를 검색하고 있습니다…';
@@ -269,6 +329,31 @@
   }
   $('save-history').addEventListener('click', historyStats);
   $('delete-history').addEventListener('click', historyStats);
+  $('apply-eff').addEventListener('click', () => {
+    let rows = [];
+    try { rows = JSON.parse(localStorage.getItem('ev-day-history-v1') || '[]'); } catch (_) {}
+    if (!Array.isArray(rows)) rows = [];
+    const values = rows.flatMap(h => {
+      const v = h.inputs;
+      if (!h.noCharge || !v || ![v.soc,v.cap,v.distance,v.hours,v.power,h.actual].every(Number.isFinite) || v.distance <= 0 || h.actual >= v.soc) return [];
+      const energy = (v.soc-h.actual)*v.cap/100-v.hours*v.power;
+      const efficiency = v.distance/energy;
+      return energy > 0 && efficiency >= 0.1 && efficiency <= 20 ? [efficiency] : [];
+    }).sort((a,b) => a-b);
+    if (values.length < 3) { $('eff-suggestion').textContent = '적용 가능한 확인 기록이 3개 이상 필요합니다.'; return; }
+    const n = values.length;
+    const median = n % 2 ? values[(n-1)/2] : (values[n/2-1]+values[n/2])/2;
+    $('eff').value = median.toFixed(1);
+    $('eff').dispatchEvent(new Event('input', {bubbles:true}));
+    $('eff-suggestion').textContent = '참고 전비 ' + median.toFixed(1) + ' km/kWh를 적용했습니다. 이번 조건에 적절한지 확인한 뒤 다시 계산하세요.';
+  });
+  $('export-history').addEventListener('click', () => {
+    if (!window.CabinNative || !window.CabinNative.exportData) { $('eff-suggestion').textContent = '설치형 앱에서 기록을 내보낼 수 있습니다.'; return; }
+    let rows = [];
+    try { rows = JSON.parse(localStorage.getItem('ev-day-history-v1') || '[]'); } catch (_) {}
+    window.CabinNative.exportData(JSON.stringify({version:1,history:Array.isArray(rows)?rows:[]}));
+    $('eff-suggestion').textContent = '공유할 앱을 선택하세요. 경유지 등 개인 정보가 포함됩니다.';
+  });
   $('reminder-set').addEventListener('click', () => {
     if (!window.CabinNative || !window.CabinNative.setReminder) { $('reminder-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
     $('reminder-status').textContent = '알림을 예약하고 있습니다…';
@@ -281,4 +366,5 @@
   window.addEventListener('ev-reminder', e => { $('reminder-status').textContent = String(e.detail || ''); });
   historyStats();
   render();
+  applyUx();
 })();
