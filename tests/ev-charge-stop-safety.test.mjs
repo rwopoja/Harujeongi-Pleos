@@ -5,6 +5,7 @@ const w = new Window({url:'https://example.test'});
 w.document.write(fs.readFileSync('web/ev-day.html','utf8').replace(/<script[^>]*><\/script>/g,''));
 for (const f of ['ev-day.js','ev-journey.js','ev-planner.js']) w.eval(fs.readFileSync('web/'+f,'utf8'));
 const $ = id => w.document.getElementById(id);
+assert.ok($('charge-before-idle').compareDocumentPosition($('charge-calc')) & w.Node.DOCUMENT_POSITION_FOLLOWING, 'pre-charge idle input must precede charging action');
 $('soc').value='10'; $('cap').value='60'; $('eff').value='5'; $('distance').value='90'; $('hours').value='2'; $('power').value='2'; $('charger-distance').value='20';
 $('charge-calc').click(); assert.match($('charge-result').textContent,/도착 전 정차 소비량을 입력/);
 $('charge-added').value='10'; $('charge-scenario').click(); assert.match($('charge-scenario-result').textContent,/도착 전 정차 소비량을 입력/);
