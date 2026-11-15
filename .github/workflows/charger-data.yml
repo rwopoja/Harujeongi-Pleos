@@ -13,6 +13,9 @@ jobs:
       - name: Retrieve public charger location CSV
         run: |
           curl -fL --retry 2 --max-time 90 'https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000002889115&fileDetailSn=1&insertDataPrcus=N' -o charger-data
+          curl -fL --max-time 60 'https://www.data.go.kr/data/15102458/fileData.do' -o portal-page || true
+          wc -c portal-page || true
+          grep -iE 'fileDownload|atchFileId|fileDetailSn|csv' portal-page | head -40 || true
           file charger-data
           wc -c charger-data
           head -c 800 charger-data || true
