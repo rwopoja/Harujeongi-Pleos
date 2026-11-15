@@ -6,7 +6,11 @@
  let saved;try{saved=JSON.parse(localStorage.getItem(key)||'null');}catch(_){}
  if(saved&&typeof saved==='object')for(const id of ids)if(Number.isFinite(saved[id]))el(id).value=saved[id];
  el('form').addEventListener('submit',e=>{
-  e.preventDefault();if(!el('form').reportValidity())return;
+  e.preventDefault();
+  // Clear the current display before validation: later listeners must not treat
+  // an earlier forecast as the result of this failed calculation.
+  el('result').textContent='입력값을 확인하고 계획을 다시 계산해 주세요.';
+  if(!el('form').reportValidity())return;
   const v=Object.fromEntries(ids.map(id=>[id,Number(el(id).value)]));
   if(ids.some(id=>!Number.isFinite(v[id]))||v.cap<=0||v.eff<=0){el('result').textContent='입력값을 확인해 주세요.';return;}
   const drive=v.distance/v.eff,rest=v.hours*v.power,total=drive+rest;

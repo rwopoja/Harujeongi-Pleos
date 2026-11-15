@@ -1,0 +1,25 @@
+import {Window} from 'happy-dom';
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const w = new Window({url:'https://example.test'});
+w.document.write(fs.readFileSync('web/ev-day.html','utf8').replace(/<script[^>]*><\/script>/g,''));
+for (const f of ['ev-day.js','ev-journey.js','ev-planner.js']) w.eval(fs.readFileSync('web/'+f,'utf8'));
+const $ = id => w.document.getElementById(id);
+$('soc').value='10'; $('cap').value='60'; $('eff').value='5'; $('distance').value='90'; $('hours').value='2'; $('power').value='2'; $('charger-distance').value='20';
+$('charge-calc').click(); assert.match($('charge-result').textContent,/도착 전 정차 소비량을 입력/);
+$('charge-added').value='10'; $('charge-scenario').click(); assert.match($('charge-scenario-result').textContent,/도착 전 정차 소비량을 입력/);
+$('charge-before-idle').value='2.5'; $('charge-calc').click(); assert.match($('charge-result').textContent,/도착 전에 배터리가 소진/);
+$('charge-scenario').click(); assert.match($('charge-scenario-result').textContent,/도착 전에 배터리가 소진/);
+$('charge-before-idle').value='5'; $('charge-calc').click(); assert.match($('charge-result').textContent,/전체 정차 소비량 이하/);
+$('soc').value='90'; $('charge-before-idle').value='4'; $('charge-added').value='12'; $('charge-scenario').click(); assert.match($('charge-scenario-result').textContent,/일정 종료 예상 잔량/);
+$('charge-calc').click(); assert.match($('charge-result').textContent,/76\.7%/);
+$('charge-before-idle').dispatchEvent(new w.Event('input',{bubbles:true})); assert.match($('charge-result').textContent,/다시 계산/);
+// A rejected new calculation must not leave the previous result as current.
+$('soc').value='70'; $('hours').value='0'; $('power').value='0';
+$('form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+assert.match($('result').innerText,/예상 소비/);
+$('cap').value='';
+$('form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+assert.doesNotMatch($('result').innerText,/예상 소비/);
+console.log('Charging recommendations include pre-charge idle consumption and reject unreachable stations');
+await w.happyDOM.abort();
