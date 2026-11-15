@@ -107,6 +107,7 @@
     $('result').textContent = '일정이 변경됐습니다. 거리와 차량 정보를 확인하고 다시 계산해 주세요.';
     $('charge-result').textContent = '일정이 변경됐습니다. 충전 계획을 다시 계산해 주세요.';
     $('charge-scenario-result').textContent = '일정이 변경됐습니다. 충전 후 귀가 잔량을 다시 계산해 주세요.';
+    $('weather-status').textContent = '일정이 변경됐습니다. 출발지를 확인한 뒤 날씨를 다시 조회하세요.';
     $('charger-list').replaceChildren();
     save();
   };
@@ -257,7 +258,8 @@
   });
 
   function request(payload) {
-    if (!$('map-consent').checked) return Promise.reject(new Error('외부 지도 서비스 전송에 동의해 주세요.'));
+    if (payload.type === 'weather' && !$('weather-consent').checked) return Promise.reject(new Error('날씨 제공자에게 출발지 좌표를 전송하는 데 동의해 주세요.'));
+    if (payload.type !== 'weather' && !$('map-consent').checked) return Promise.reject(new Error('외부 지도 서비스 전송에 동의해 주세요.'));
     if (!window.HaruNative || !window.HaruNative.mapRequest) return Promise.reject(new Error('설치형 앱의 지도 연결이 필요합니다.'));
     const id = String(Date.now() * 100 + (++serial % 100));
     return new Promise((resolve, reject) => {
@@ -295,6 +297,19 @@
     } catch (e) { if (at === revision) container.textContent = e.message; }
   }
   $('origin-search').addEventListener('click', () => searchPoint(plan.origin, $('origin-results')));
+  let weatherSequence=0;
+  $('weather-check').addEventListener('click', async () => {
+    if (!coordinate(plan.origin)) { $('weather-status').textContent = '먼저 출발지 검색 결과 또는 확인한 내비 현재 위치를 선택해 주세요.'; return; }
+    const at=revision, sequence=++weatherSequence; $('weather-status').textContent='출발지 날씨를 조회하고 있습니다…';
+    try {
+      const data=await request({type:'weather',lat:plan.origin.lat,lon:plan.origin.lon});
+      if (at !== revision || sequence !== weatherSequence || !$('weather-consent').checked) return;
+      const current=data && data.current, temperature=current && current.temperature_2m, precipitation=current && current.precipitation;
+      if (!Number.isFinite(temperature) || temperature < -100 || temperature > 70 || !Number.isFinite(precipitation) || precipitation < 0 || precipitation > 1000 || typeof current.time !== 'string' || current.time.length > 40) throw new Error('날씨 응답을 확인할 수 없습니다.');
+      $('weather-status').textContent='Open-Meteo 모델 정보 · 기준 '+current.time+' · 기온 '+temperature.toFixed(1)+'°C · 강수 '+precipitation.toFixed(1)+' mm. 예측 전비에는 자동 반영되지 않습니다.';
+    } catch (e) { if (at === revision && sequence === weatherSequence) $('weather-status').textContent=e.message; }
+  });
+  $('weather-consent').addEventListener('change',()=>{if (!$('weather-consent').checked) {weatherSequence++;$('weather-status').textContent='날씨 제공자 좌표 전송 동의가 해제됐습니다.';}});
   function render() {
     $('origin').value = plan.origin.name || '';
     $('origin-results').textContent = describe(plan.origin);

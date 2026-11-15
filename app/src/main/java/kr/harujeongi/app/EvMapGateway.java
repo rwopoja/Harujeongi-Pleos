@@ -58,6 +58,12 @@ final class EvMapGateway {
      }
      body = get("https://router.project-osrm.org/route/v1/driving/" + coords + "?overview=false&steps=false", null);
      emit(id, new JSONObject().put("ok", true).put("data", new JSONObject(body)));
+    } else if ("weather".equals(type)) {
+     double lat = request.getDouble("lat"), lon = request.getDouble("lon");
+     validate(lat, lon);
+     String query = String.format(Locale.US, "https://api.open-meteo.com/v1/forecast?latitude=%.6f&longitude=%.6f&current=temperature_2m,precipitation,weather_code&timezone=auto", lat, lon);
+     body = get(query, null);
+     emit(id, new JSONObject().put("ok", true).put("data", new JSONObject(body)));
     } else if ("chargers".equals(type)) {
      double lat = request.getDouble("lat"), lon = request.getDouble("lon");
      validate(lat, lon);
