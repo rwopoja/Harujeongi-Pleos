@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 const w = new Window({url:'https://example.test'});
 const calls = [];
 const spoken = [];
+const pushes = [];
 let reminder = null;
 let naviRequests = 0;
 w.CabinNative = {
@@ -14,6 +15,7 @@ w.CabinNative = {
   setReminder(minutes){ reminder = minutes; },
   cancelReminder(){ reminder = null; },
   observeNavi(){ naviRequests++; },
+  pushRequest(id,json){ pushes.push({id, request:JSON.parse(json)}); },
   mapRequest(id, json){ calls.push({id, request:JSON.parse(json)}); }
 };
 w.document.write(fs.readFileSync('web/ev-day.html','utf8').replace(/<script[^>]*><\/script>/g,''));
@@ -132,6 +134,22 @@ w.dispatchEvent(new w.CustomEvent('ev-reminder',{detail:'60분 후 이 기기에
 assert.match($('reminder-status').textContent,/60분/);
 $('reminder-cancel').click();
 assert.equal(reminder,null);
+$('push-generate').click();
+assert.match($('push-topic').value,/^harujeongi-[a-f0-9]{48}$/);
+$('push-test').click();
+assert.equal(pushes.length,0,'push requires explicit consent');
+$('push-consent').checked=true;
+$('push-auto').checked=true;
+input('soc','10');
+$('form').dispatchEvent(new w.Event('submit',{cancelable:true,bubbles:true}));
+assert.equal(pushes.at(-1).request.action,'schedule');
+assert.equal(pushes.at(-1).request.low,true);
+assert.equal('route' in pushes.at(-1).request,false,'no route details are sent to the push gateway');
+w.dispatchEvent(new w.CustomEvent('ev-push',{detail:{id:pushes.at(-1).id,ok:true,action:'schedule'}}));
+assert.match($('push-status').textContent,/서버가 예약/);
+input('soc','90');
+$('form').dispatchEvent(new w.Event('submit',{cancelable:true,bubbles:true}));
+assert.equal(pushes.at(-1).request.action,'cancel','a safe recalculation cancels a pending shortage alert');
 $('new-route').click();
 assert.equal($('points').children.length,0);
 assert.equal($('origin').value,'');

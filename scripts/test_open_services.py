@@ -1,6 +1,7 @@
 """Best-effort live checks with public, non-user locations; not a Pleos test."""
 import json
 import pathlib
+import secrets
 import urllib.parse
 import urllib.request
 
@@ -28,7 +29,7 @@ for name, (url, body) in tests.items():
         results[name] = {"ok": False, "error": type(exc).__name__, "message": str(exc)[:200]}
 query = urllib.parse.urlencode({"data": "[out:json][timeout:10];(node[amenity=charging_station](around:4000,37.5663,126.978);way[amenity=charging_station](around:4000,37.5663,126.978););out center tags 20;"})
 results["chargers"] = {"ok": False, "attempts": []}
-for host in ("https://overpass.kumi.systems/api/interpreter", "https://overpass-api.de/api/interpreter"):
+for host in ("https://overpass.private.coffee/api/interpreter", "https://overpass-api.de/api/interpreter"):
     try:
         req = urllib.request.Request(host + "?" + query, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=12) as response:
@@ -39,6 +40,20 @@ for host in ("https://overpass.kumi.systems/api/interpreter", "https://overpass-
             break
     except Exception as exc:
         results["chargers"]["attempts"].append({"host":host,"ok":False,"error":type(exc).__name__})
+# Disposable, random topic; no personal or trip data is published.
+topic = "harujeongi-" + secrets.token_hex(24)
+url = "https://ntfy.sh/" + topic + "/ev-plan"
+try:
+    req = urllib.request.Request(url, data=b"Harujeongi notification test", method="POST",
+        headers={**HEADERS, "Delay":"1m", "Content-Type":"text/plain"})
+    with urllib.request.urlopen(req, timeout=12) as response:
+        scheduled = 200 <= response.status < 300
+    req = urllib.request.Request(url, method="DELETE", headers=HEADERS)
+    with urllib.request.urlopen(req, timeout=12) as response:
+        cancelled = 200 <= response.status < 300
+    results["phone_push"] = {"ok":scheduled and cancelled,"note":"server accepted test scheduling and cancellation; no phone delivery tested"}
+except Exception as exc:
+    results["phone_push"] = {"ok":False,"error":type(exc).__name__}
 (OUT / "public-map-services.json").write_text(json.dumps(results, ensure_ascii=False, indent=2))
 print(json.dumps(results, ensure_ascii=False, indent=2))
 if not all(row["ok"] for row in results.values()):

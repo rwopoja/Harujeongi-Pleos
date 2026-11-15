@@ -55,7 +55,7 @@ final class EvMapGateway {
      String around = String.format(Locale.US, "(around:4000,%.6f,%.6f)", lat, lon);
      String q = "[out:json][timeout:15];(node[amenity=charging_station]" + around + ";way[amenity=charging_station]" + around + ";relation[amenity=charging_station]" + around + ";);out center tags 50;";
      String encoded = URLEncoder.encode(q, "UTF-8");
-     try { body = get("https://overpass.kumi.systems/api/interpreter?data=" + encoded, null); }
+     try { body = get("https://overpass.private.coffee/api/interpreter?data=" + encoded, null); }
      catch (Exception first) { body = get("https://overpass-api.de/api/interpreter?data=" + encoded, null); }
      emit(id, new JSONObject().put("ok", true).put("data", new JSONObject(body)));
     } else throw new IllegalArgumentException("지원하지 않는 요청입니다.");

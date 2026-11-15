@@ -91,6 +91,12 @@
     $('voice-route').click();
     $('voice-status').scrollIntoView({behavior:'smooth',block:'center'});
   });
+  for (const tab of document.querySelectorAll('[data-jump]')) {
+    tab.addEventListener('click', () => {
+      const target = $(tab.getAttribute('data-jump'));
+      if (target) target.scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  }
   window.addEventListener('cabin-voice', e => {
     const heard = String(e.detail?.text || '').trim();
     if (!heard) return;
@@ -364,6 +370,83 @@
     window.CabinNative.cancelReminder();
   });
   window.addEventListener('ev-reminder', e => { $('reminder-status').textContent = String(e.detail || ''); });
+  let pushPrefs = {};
+  try { pushPrefs = JSON.parse(localStorage.getItem('ev-push-v1') || '{}'); } catch (_) {}
+  if (!pushPrefs || typeof pushPrefs !== 'object') pushPrefs = {};
+  $('push-topic').value = typeof pushPrefs.topic === 'string' && /^harujeongi-[a-f0-9]{48}$/.test(pushPrefs.topic) ? pushPrefs.topic : '';
+  $('push-consent').checked = pushPrefs.consent === true;
+  $('push-auto').checked = pushPrefs.auto === true && pushPrefs.consent === true;
+  if ([15,30,60,120,360].includes(pushPrefs.minutes)) $('push-minutes').value = String(pushPrefs.minutes);
+  function savePushPrefs() {
+    try { localStorage.setItem('ev-push-v1', JSON.stringify({topic:$('push-topic').value,consent:$('push-consent').checked,auto:$('push-auto').checked,minutes:Number($('push-minutes').value)})); }
+    catch (_) { $('push-status').textContent = '알림 설정을 기기에 저장하지 못했습니다.'; }
+  }
+  for (const id of ['push-consent','push-auto','push-minutes']) $(id).addEventListener('change', () => {
+    if (!$('push-consent').checked) $('push-auto').checked = false;
+    savePushPrefs();
+  });
+  $('push-generate').addEventListener('click', () => {
+    if ($('push-topic').value && !window.confirm('연결 코드를 바꾸면 휴대폰에서 새 코드로 다시 구독해야 합니다. 이전 예약은 먼저 취소했나요?')) return;
+    if (!window.crypto || !window.crypto.getRandomValues) { $('push-status').textContent = '안전한 연결 코드를 만들 수 없는 기기입니다.'; return; }
+    const bytes = new Uint8Array(24); window.crypto.getRandomValues(bytes);
+    $('push-topic').value = 'harujeongi-' + [...bytes].map(v => v.toString(16).padStart(2,'0')).join('');
+    try { localStorage.removeItem('ev-push-pending-v1'); } catch (_) {}
+    $('push-auto').checked = false; savePushPrefs();
+    $('push-status').textContent = '휴대폰 ntfy 앱에서 이 코드를 구독한 다음 시험 알림을 보내세요.';
+  });
+  let pushSerial = 0;
+  const pushPending = new Map();
+  function sendPush(action, low = false) {
+    const topic = $('push-topic').value;
+    if (!$('push-consent').checked) { $('push-status').textContent = '알림 서비스 전송에 동의해 주세요.'; return; }
+    if (!/^harujeongi-[a-f0-9]{48}$/.test(topic)) { $('push-status').textContent = '먼저 연결 코드를 만들어 주세요.'; return; }
+    if (!window.CabinNative || !window.CabinNative.pushRequest) { $('push-status').textContent = '설치형 앱에서 사용할 수 있습니다.'; return; }
+    const id = String(Date.now()*100+(++pushSerial%100));
+    pushPending.set(id, action);
+    if (action === 'schedule') { try { localStorage.setItem('ev-push-pending-v1','1'); } catch (_) {} }
+    setTimeout(() => {
+      if (pushPending.delete(id)) $('push-status').textContent = '응답 시간이 초과됐습니다. 서버 예약 여부를 확인하거나 취소를 요청하세요.';
+    }, 30000);
+    $('push-status').textContent = '알림 서버에 요청 중…';
+    try { window.CabinNative.pushRequest(id, JSON.stringify({action,topic,minutes:Number($('push-minutes').value),low})); }
+    catch (_) { pushPending.delete(id); $('push-status').textContent = '알림 요청을 시작하지 못했습니다.'; }
+  }
+  window.addEventListener('ev-push', e => {
+    const data = e.detail || {}, action = pushPending.get(String(data.id));
+    if (!action) return;
+    pushPending.delete(String(data.id));
+    if (!data.ok) { $('push-status').textContent = String(data.error || '알림 서버 요청에 실패했습니다.'); return; }
+    if (action === 'schedule') {
+      try { localStorage.setItem('ev-push-pending-v1','1'); } catch (_) {}
+      $('push-status').textContent = '서버가 예약을 접수했습니다. 휴대폰의 실제 수신은 별도로 확인하세요.';
+    } else if (action === 'cancel') {
+      try { localStorage.removeItem('ev-push-pending-v1'); } catch (_) {}
+      $('push-status').textContent = '서버에 예약 취소를 요청했습니다.';
+    } else $('push-status').textContent = '시험 알림을 서버에 보냈습니다. 휴대폰에서 수신 여부를 확인하세요.';
+  });
+  function currentForecast() {
+    let p;
+    try { p = JSON.parse(localStorage.getItem('ev-day-last-prediction-v1') || 'null'); } catch (_) {}
+    if (!p || !p.inputs || !Number.isFinite(p.raw) || !Number.isFinite(p.inputs.reserve) || !($('result').innerText || '').includes('예상 소비')) return null;
+    return p;
+  }
+  $('push-test').addEventListener('click', () => sendPush('test'));
+  $('push-schedule').addEventListener('click', () => {
+    const p = currentForecast();
+    sendPush('schedule', !!p && p.raw < p.inputs.reserve);
+  });
+  $('push-cancel').addEventListener('click', () => sendPush('cancel'));
+  $('form').addEventListener('submit', () => {
+    if (!$('push-auto').checked || !$('push-consent').checked) return;
+    const p = currentForecast();
+    if (!p) return;
+    if (p.raw < p.inputs.reserve) sendPush('schedule', true);
+    else {
+      let hadPending = false;
+      try { hadPending = localStorage.getItem('ev-push-pending-v1') === '1'; } catch (_) {}
+      if (hadPending) sendPush('cancel');
+    }
+  });
   historyStats();
   render();
   applyUx();
