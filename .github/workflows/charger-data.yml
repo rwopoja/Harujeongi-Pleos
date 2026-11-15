@@ -1,0 +1,22 @@
+name: Inspect public KEPCO charger dataset
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/charger-data.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Retrieve public charger location CSV
+        run: |
+          curl -fL --retry 2 --max-time 90 'https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000002889115&fileDetailSn=1&insertDataPrcus=N' -o charger-data
+          file charger-data
+          wc -c charger-data
+          head -c 800 charger-data || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kepco-public-charger-data
+          path: charger-data
