@@ -89,6 +89,10 @@ await tick();
 assert.equal(calls.length, 0, 'no external request before consent');
 assert.match($('origin-results').textContent,/동의/);
 $('map-consent').checked = true;
+$('origin-search').click();
+await respond(calls.at(-1),[null,{lat:'',lon:'',display_name:'빈 좌표'},{lat:null,lon:null,display_name:'누락 좌표'},{lat:'0',lon:'0',display_name:'기본 좌표'}]);
+assert.match($('origin-results').textContent,/유효한 위치/);
+assert.equal($('origin-results').querySelectorAll('button').length,0);
 
 // An outdated response must never confirm the wrong location.
 $('origin-search').click();
@@ -144,6 +148,9 @@ await respond(call,{code:'Ok',routes:[{distance:5600,legs:[{distance:5600}]}]});
 assert.equal($('distance').value,'5.6');
 assert.match($('result').innerText,/kWh/);
 assert.match($('map-status').textContent,/5.6 km/);
+$('route-search').click();
+await respond(calls.at(-1),{code:'Ok',routes:[{distance:56000,legs:[{distance:1000}]}]});
+assert.match($('map-status').textContent,/일치하지 않습니다/);assert.equal($('distance').value,'5.6');
 
 // Out-of-order routing response after a change cannot replace the current distance.
 $('route-search').click();
@@ -164,7 +171,8 @@ assert.match($('charger-list').textContent,/직접 입력/);
 $('find-chargers').click();
 call = calls.at(-1);
 assert.equal(call.request.type,'chargers');
-await respond(call,{elements:[{lat:37.565,lon:126.977,tags:{name:'시험 충전소'}}]});
+await respond(call,{elements:[null,{lat:'',lon:'',tags:{name:'잘못된 좌표'}},{lat:37.565,lon:126.977,tags:{name:'시험 충전소'}}]});
+assert.doesNotMatch($('charger-list').textContent,/잘못된 좌표/);
 assert.match($('charger-list').textContent,/직선/);
 option($('charger-list'),'시험 충전소').click();
 call = calls.at(-1);

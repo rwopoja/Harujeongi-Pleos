@@ -113,6 +113,11 @@
   };
   const coordinate = point => point && Number.isFinite(point.lat) && Number.isFinite(point.lon)
     && Math.abs(point.lat) <= 90 && Math.abs(point.lon) <= 180;
+  const parseCoordinate = value => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
+    if (typeof value !== 'string' || !value.trim()) return NaN;
+    const n = Number(value); return Number.isFinite(n) ? n : NaN;
+  };
   const button = (label, action, className = 'option') => {
     const b = document.createElement('button'); b.type = 'button'; b.className = className; b.textContent = label;
     b.addEventListener('click', action); return b;
@@ -286,8 +291,9 @@
       container.replaceChildren();
       if (!Array.isArray(data) || !data.length) { container.textContent = '검색 결과가 없습니다. 더 구체적인 주소로 다시 검색하세요.'; return; }
       for (const row of data.slice(0, 5)) {
-        const lat = Number(row.lat), lon = Number(row.lon), label = String(row.display_name || '');
-        if (!coordinate({lat, lon}) || !label) continue;
+        if (!row || typeof row !== 'object') continue;
+        const lat = parseCoordinate(row.lat), lon = parseCoordinate(row.lon), label = String(row.display_name || '');
+        if (!coordinate({lat, lon}) || (lat === 0 && lon === 0) || !label) continue;
         container.append(button(label, () => {
           point.lat = lat; point.lon = lon; point.label = label; changed(); render();
           $('map-status').textContent = '장소를 확인했습니다. 모든 경유지를 확인한 뒤 경로를 계산하세요.';
@@ -373,8 +379,11 @@
   async function roadRoute(points) {
     const data = await request({type:'route', points: points.map(p => ({lat:p.lat, lon:p.lon}))});
     const route = data && data.code === 'Ok' && Array.isArray(data.routes) && data.routes[0];
-    if (!route || !Number.isFinite(route.distance) || route.distance <= 0 || route.distance > 3000000 || !Array.isArray(route.legs) || route.legs.length !== points.length - 1 || route.legs.some(l => !Number.isFinite(l.distance) || l.distance < 0))
+    if (!route || !Number.isFinite(route.distance) || route.distance <= 0 || route.distance > 3000000 || !Array.isArray(route.legs) || route.legs.length !== points.length - 1 || route.legs.some(l => !l || !Number.isFinite(l.distance) || l.distance < 0))
       throw new Error('도로 경로를 계산하지 못했습니다. 장소와 도로 연결을 확인하세요.');
+    const legTotal = route.legs.reduce((sum, leg) => sum + leg.distance, 0);
+    if (!Number.isFinite(legTotal) || Math.abs(legTotal - route.distance) > Math.max(25, route.distance * 0.01))
+      throw new Error('도로 경로의 전체 거리와 구간 거리가 일치하지 않습니다. 다시 조회해 주세요.');
     return route;
   }
   function applyDistance(km) {
@@ -536,10 +545,10 @@
       if (!anchor) throw new Error('검색할 위치를 선택해 주세요.');
       const data = await request({type:'chargers', lat:anchor.lat, lon:anchor.lon});
       if (at !== revision) return;
-      const stations = (Array.isArray(data.elements) ? data.elements : []).map(e => ({
-        lat: Number(e.lat ?? e.center?.lat), lon: Number(e.lon ?? e.center?.lon),
+      const stations = (Array.isArray(data?.elements) ? data.elements : []).filter(e => e && typeof e === 'object').map(e => ({
+        lat: parseCoordinate(e.lat ?? e.center?.lat), lon: parseCoordinate(e.lon ?? e.center?.lon),
         name: String(e.tags?.name || e.tags?.operator || '이름 없는 충전소')
-      })).filter(coordinate).map(s => ({...s, straight:straightDistance(anchor,s)})).sort((a,b) => a.straight-b.straight).slice(0,6);
+      })).filter(s => coordinate(s) && !(s.lat === 0 && s.lon === 0)).map(s => ({...s, straight:straightDistance(anchor,s)})).sort((a,b) => a.straight-b.straight).slice(0,6);
       host.replaceChildren();
       if (!stations.length) { host.textContent = '공개 지도에서 주변 충전소를 찾지 못했습니다. 다른 위치를 선택하거나 직접 입력해 주세요.'; return; }
       const note = document.createElement('p'); note.textContent = '선택한 위치에서 직선거리 기준입니다. 영업·고장·사용 가능 여부는 확인되지 않았습니다.'; host.append(note);
