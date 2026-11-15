@@ -159,6 +159,10 @@ option($('origin-results'),'새 출발지').click();
 
 $('find-chargers').click();
 call = calls.at(-1);
+w.dispatchEvent(new w.CustomEvent('ev-map-result',{detail:{id:call.id,result:{ok:false,error:'공개 충전소 검색에 실패했습니다. 다른 서비스에서 충전소를 확인하고 아래에 직접 입력해 주세요.'}}}));await tick();
+assert.match($('charger-list').textContent,/직접 입력/);
+$('find-chargers').click();
+call = calls.at(-1);
 assert.equal(call.request.type,'chargers');
 await respond(call,{elements:[{lat:37.565,lon:126.977,tags:{name:'시험 충전소'}}]});
 assert.match($('charger-list').textContent,/직선/);
