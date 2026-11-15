@@ -26,5 +26,10 @@ jobs:
           jar tf classes.jar | grep -E 'NaviHelper|DestinationInfo|TripInfo|WaypointInfo|NaviError'
           javap -classpath classes.jar ai.pleos.playground.navi.helper.NaviHelper
           javap -classpath classes.jar ai.pleos.playground.navi.helper.listener.NaviHelperEventListener
-          javap -classpath classes.jar ai.pleos.playground.navi.data.DestinationInfo
-          javap -classpath classes.jar ai.pleos.playground.navi.data.TripInfo || true
+          curl -fSs 'https://nexus-playground.pleos.ai/repository/maven-releases/ai/pleos/playground/navi-data/3.0.4/navi-data-3.0.4.aar' -o data.aar
+          unzip -p data.aar classes.jar > data.jar
+          javap -classpath data.jar ai.pleos.playground.navi.data.DestinationInfo
+          javap -classpath data.jar ai.pleos.playground.navi.data.TripInfo
+          javap -classpath data.jar ai.pleos.playground.navi.data.WaypointInfo
+          javap -classpath data.jar ai.pleos.playground.navi.data.CurrentLocationInfo
+          javap -classpath data.jar ai.pleos.playground.navi.data.RouteStateInfo
