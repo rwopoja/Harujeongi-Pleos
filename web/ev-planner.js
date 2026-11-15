@@ -392,7 +392,7 @@
     try { localStorage.setItem('ev-route-distance-derived-v1', 'true'); localStorage.removeItem('ev-route-distance-invalid-v1'); } catch (_) {}
     $('result').textContent = '차량 정보와 정차·충전 계획을 확인하고 있습니다.';
     $('form').dispatchEvent(new Event('submit', {cancelable:true, bubbles:true}));
-    return ($('result').innerText || '').includes('예상 소비');
+    return !!$('result').dataset.predictionId && ($('result').innerText || '').includes('예상 소비');
   }
   $('distance').addEventListener('input', () => {
     routeVersion++;
@@ -715,7 +715,7 @@
   function currentForecast() {
     let p;
     try { p = JSON.parse(localStorage.getItem('ev-day-last-prediction-v1') || 'null'); } catch (_) {}
-    if (!p || !p.inputs || !Number.isFinite(p.raw) || !Number.isFinite(p.inputs.reserve) || !($('result').innerText || '').includes('예상 소비')) return null;
+    if (!p || !p.id || p.id !== $('result').dataset.predictionId || !p.inputs || !Number.isFinite(p.raw) || !Number.isFinite(p.inputs.reserve) || !($('result').innerText || '').includes('예상 소비')) return null;
     return p;
   }
   $('push-test').addEventListener('click', () => sendPush('test'));

@@ -10,6 +10,7 @@
   // Clear the current display before validation: later listeners must not treat
   // an earlier forecast as the result of this failed calculation.
   el('result').textContent='입력값을 확인하고 계획을 다시 계산해 주세요.';
+  delete el('result').dataset.predictionId;
   if(!el('form').reportValidity())return;
   const v=Object.fromEntries(ids.map(id=>[id,Number(el(id).value)]));
   if(ids.some(id=>!Number.isFinite(v[id]))||v.cap<=0||v.eff<=0){el('result').textContent='입력값을 확인해 주세요.';return;}
@@ -34,7 +35,8 @@
   else {text+=`일정 종료 예상 잔량 ${raw.toFixed(1)}% · 목표 여유 대비 ${(raw-v.reserve).toFixed(1)}%p\n`;text+=raw<v.reserve?'입력한 조건에서 목표 여유에 미달합니다. 충전 계획을 확인하세요.':'입력한 조건에서는 목표 여유 이상입니다. 실제 보장은 아닙니다.';}
   if(charge)text+='\n충전 전 정차 소비량과 배터리 유입 충전량은 사용자가 입력한 가정입니다. 실제 충전 속도와 도착 가능 여부는 달라질 수 있습니다.';
   el('result').innerText=text;el('result').style.whiteSpace='pre-line';
-  try{localStorage.setItem(key,JSON.stringify(v));localStorage.setItem('ev-day-last-prediction-v1',JSON.stringify({raw,inputs:v,charge,id:String(Date.now())+'-'+Math.random().toString(36).slice(2),route:el('route').value.trim()||'미입력',createdAt:Date.now()}));}catch(_){el('result').innerText+='\n입력값을 저장하지 못했습니다.';}
+  const id=String(Date.now())+'-'+Math.random().toString(36).slice(2);
+  try{localStorage.setItem(key,JSON.stringify(v));localStorage.setItem('ev-day-last-prediction-v1',JSON.stringify({raw,inputs:v,charge,id,route:el('route').value.trim()||'미입력',createdAt:Date.now()}));el('result').dataset.predictionId=id;}catch(_){el('result').innerText+='\n예측을 저장하지 못해 기록과 자동 알림에 반영하지 않았습니다.';}
  });
  for(const id of ['charger-distance','charge-added','charge-before-idle','charge-included'])el(id).addEventListener(id==='charge-included'?'change':'input',()=>{
   el('result').textContent='충전 계획이 변경됐습니다. 계획을 다시 계산해 주세요.';
