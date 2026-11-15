@@ -30,9 +30,11 @@ final class EvMapGateway {
  void request(String id, String raw) {
   if (closed || id == null || !id.matches("[0-9]{1,16}") || raw == null || raw.length() > 8000) return;
   worker.execute(() -> {
+   String type = "";
    try {
     JSONObject request = new JSONObject(raw);
-    String type = request.getString("type"), body;
+    type = request.getString("type");
+    String body;
     if ("geocode".equals(type)) {
      String query = request.getString("query").trim();
      if (query.length() < 1 || query.length() > 150) throw new IllegalArgumentException("검색어 길이를 확인하세요.");
@@ -58,18 +60,24 @@ final class EvMapGateway {
      }
      body = get("https://router.project-osrm.org/route/v1/driving/" + coords + "?overview=false&steps=false", null);
      emit(id, new JSONObject().put("ok", true).put("data", new JSONObject(body)));
+    } else if ("weather".equals(type)) {
+     double lat = request.getDouble("lat"), lon = request.getDouble("lon");
+     validate(lat, lon);
+     String query = String.format(Locale.US, "https://api.open-meteo.com/v1/forecast?latitude=%.6f&longitude=%.6f&current=temperature_2m,precipitation,weather_code&timezone=auto", lat, lon);
+     body = get(query, null);
+     emit(id, new JSONObject().put("ok", true).put("data", new JSONObject(body)));
     } else if ("chargers".equals(type)) {
      double lat = request.getDouble("lat"), lon = request.getDouble("lon");
      validate(lat, lon);
      String around = String.format(Locale.US, "(around:4000,%.6f,%.6f)", lat, lon);
-     String q = "[out:json][timeout:15];(node[amenity=charging_station]" + around + ";way[amenity=charging_station]" + around + ";relation[amenity=charging_station]" + around + ";);out center tags 50;";
+     String q = "[out:json][timeout:10];(node[amenity=charging_station]" + around + ";way[amenity=charging_station]" + around + ";relation[amenity=charging_station]" + around + ";);out center tags 50;";
      String encoded = URLEncoder.encode(q, "UTF-8");
-     try { body = get("https://overpass.private.coffee/api/interpreter?data=" + encoded, null); }
-     catch (Exception first) { body = get("https://overpass-api.de/api/interpreter?data=" + encoded, null); }
+     try { body = get("https://overpass.private.coffee/api/interpreter?data=" + encoded, null, 14000); }
+     catch (Exception first) { body = get("https://overpass-api.de/api/interpreter?data=" + encoded, null, 14000); }
      emit(id, new JSONObject().put("ok", true).put("data", new JSONObject(body)));
     } else throw new IllegalArgumentException("지원하지 않는 요청입니다.");
    } catch (Exception e) {
-    try { emit(id, new JSONObject().put("ok", false).put("error", "연결 또는 검색에 실패했습니다. 네트워크와 입력값을 확인해 주세요.")); }
+    try { emit(id, new JSONObject().put("ok", false).put("error", "chargers".equals(type) ? "공개 충전소 검색에 실패했습니다. 다른 서비스에서 충전소를 확인하고 아래에 직접 입력해 주세요." : "연결 또는 검색에 실패했습니다. 네트워크와 입력값을 확인해 주세요.")); }
     catch (Exception ignored) { }
    }
   });
@@ -91,9 +99,12 @@ final class EvMapGateway {
   return "https://" + host + "/search";
  }
  private static String get(String address, String form) throws Exception {
+  return get(address, form, 12000);
+ }
+ private static String get(String address, String form, int readTimeout) throws Exception {
   HttpURLConnection c = (HttpURLConnection)new URL(address).openConnection();
   try {
-   c.setConnectTimeout(6000); c.setReadTimeout(12000); c.setInstanceFollowRedirects(false);
+   c.setConnectTimeout(6000); c.setReadTimeout(readTimeout); c.setInstanceFollowRedirects(false);
    c.setRequestProperty("User-Agent", "Harujeongi/0.1 (https://github.com/rwopoja/Harujeongi-Pleos)");
    c.setRequestProperty("Accept", "application/json");
    if (form != null) {

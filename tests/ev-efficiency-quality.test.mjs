@@ -1,0 +1,12 @@
+import {Window} from 'happy-dom';
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const w=new Window({url:'https://example.test'});
+const entry=actual=>({predicted:80,actual,noCharge:true,route:'시험',date:'test',inputs:{soc:100,cap:60,distance:60,hours:0,power:0}});
+w.localStorage.setItem('ev-day-history-v1',JSON.stringify([entry(80),entry(80),entry(99)]));
+w.document.write(fs.readFileSync('web/ev-day.html','utf8').replace(/<script[^>]*><\/script>/g,''));
+for(const f of ['ev-day.js','ev-journey.js','ev-planner.js'])w.eval(fs.readFileSync('web/'+f,'utf8'));
+const $=id=>w.document.getElementById(id);
+$('suggest-eff').click();assert.match($('eff-suggestion').textContent,/3개 이상/);
+$('apply-eff').click();assert.match($('eff-suggestion').textContent,/3개 이상/);
+console.log('Implausible efficiency records are excluded consistently from suggestions and application');await w.happyDOM.abort();

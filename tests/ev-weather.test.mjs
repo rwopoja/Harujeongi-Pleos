@@ -1,0 +1,12 @@
+import {Window} from 'happy-dom';import fs from 'node:fs';import assert from 'node:assert/strict';
+const w=new Window({url:'https://example.test'}),calls=[];w.HaruNative={listen(){},mapRequest(id,json){calls.push({id,req:JSON.parse(json)});}};
+w.localStorage.setItem('ev-planner-v2',JSON.stringify({origin:{name:'서울',lat:37.5,lon:127,label:'확인된 서울'},stops:[]}));
+w.document.write(fs.readFileSync('web/ev-day.html','utf8').replace(/<script[^>]*><\/script>/g,''));for(const f of ['ev-day.js','ev-journey.js','ev-planner.js'])w.eval(fs.readFileSync('web/'+f,'utf8'));w.dispatchEvent(new w.CustomEvent('ev-ux',{detail:{state:'phone',restricted:false}}));
+const $=id=>w.document.getElementById(id),tick=()=>new Promise(r=>setTimeout(r,0));
+$('weather-check').click();await tick();assert.equal(calls.length,0);assert.match($('weather-status').textContent,/동의/);
+$('weather-consent').checked=true;$('weather-check').click();assert.equal(calls[0].req.type,'weather');assert.equal(calls[0].req.lat,37.5);
+w.dispatchEvent(new w.CustomEvent('ev-map-result',{detail:{id:calls[0].id,result:{ok:true,data:{current:{time:'2026-11-15T14:00',temperature_2m:3.4,precipitation:0}}}}}));await tick();assert.match($('weather-status').textContent,/3\.4°C/);assert.match($('weather-status').textContent,/자동 반영되지/);
+$('weather-check').click();let bad=calls.at(-1);w.dispatchEvent(new w.CustomEvent('ev-map-result',{detail:{id:bad.id,result:{ok:true,data:{current:{time:'now',temperature_2m:null,precipitation:0}}}}}));await tick();assert.match($('weather-status').textContent,/확인할 수 없습니다/);
+$('weather-check').click();let revoked=calls.at(-1);$('weather-consent').checked=false;$('weather-consent').dispatchEvent(new w.Event('change'));w.dispatchEvent(new w.CustomEvent('ev-map-result',{detail:{id:revoked.id,result:{ok:true,data:{current:{time:'now',temperature_2m:10,precipitation:0}}}}}));await tick();assert.match($('weather-status').textContent,/동의가 해제/);
+$('weather-consent').checked=true;$('weather-check').click();const old=calls.at(-1);$('origin').value='다른 위치';$('origin').dispatchEvent(new w.Event('input',{bubbles:true}));w.dispatchEvent(new w.CustomEvent('ev-map-result',{detail:{id:old.id,result:{ok:true,data:{current:{time:'2026-11-15T14:00',temperature_2m:25,precipitation:0}}}}}));await tick();assert.doesNotMatch($('weather-status').textContent,/25\.0/);
+console.log('Weather consent, validated response and stale origin handling passed');await w.happyDOM.abort();

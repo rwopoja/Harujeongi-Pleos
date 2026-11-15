@@ -92,7 +92,7 @@
     const names = plan.stops.map(p => p.name.trim()).filter(Boolean);
     $('route').value = names.join(' → ');
     if (names.length) $('save-route').click();
-    else { try { localStorage.removeItem('ev-day-route-v1'); } catch (_) {} }
+    else { try { localStorage.removeItem('ev-day-route-v1'); } catch (_) {} window.dispatchEvent(new Event('ev-route-cleared')); }
   };
   const changed = () => {
     revision++;
@@ -107,11 +107,17 @@
     $('result').textContent = '일정이 변경됐습니다. 거리와 차량 정보를 확인하고 다시 계산해 주세요.';
     $('charge-result').textContent = '일정이 변경됐습니다. 충전 계획을 다시 계산해 주세요.';
     $('charge-scenario-result').textContent = '일정이 변경됐습니다. 충전 후 귀가 잔량을 다시 계산해 주세요.';
+    $('weather-status').textContent = '일정이 변경됐습니다. 출발지를 확인한 뒤 날씨를 다시 조회하세요.';
     $('charger-list').replaceChildren();
     save();
   };
   const coordinate = point => point && Number.isFinite(point.lat) && Number.isFinite(point.lon)
     && Math.abs(point.lat) <= 90 && Math.abs(point.lon) <= 180;
+  const parseCoordinate = value => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
+    if (typeof value !== 'string' || !value.trim()) return NaN;
+    const n = Number(value); return Number.isFinite(n) ? n : NaN;
+  };
   const button = (label, action, className = 'option') => {
     const b = document.createElement('button'); b.type = 'button'; b.className = className; b.textContent = label;
     b.addEventListener('click', action); return b;
@@ -127,14 +133,60 @@
     value = value.replace(/(?:에|으로|로)?\s*(?:돌아올\s*거(?:야|예요|에요)?|돌아갈\s*거(?:야|예요|에요)?|돌아가(?:요|겠습니다)|돌아와요|가려고\s*해요|갈\s*거(?:야|예요|에요)?|갈게요?|갑니다|가겠습니다|갈래요|가요|간다)\s*[.!?。]*$/g, '');
     return value.split(/\s*(?:→|->|,|，|\n)\s*/).map(x => x.trim().replace(/^(?:그리고|그다음|그 다음)\s*/, '').replace(/(?:에|으로|까지)$/, '').trim()).filter(Boolean).slice(0, 8);
   }
-  window.EvPlanner = {parseStops};
-  function preview(text, speak) {
-    if (/(?:에어컨|히터|공조|기다리|대기|주차(?:해|하고|중|할|한|를|하))/.test(String(text || ''))) {
-      draft = []; $('apply-draft').hidden = true;
-      $('draft-status').textContent = '장소와 정차 중 전기 사용을 한 번에 구분하지 못했습니다. 방문 장소만 먼저 말씀하거나 입력하고, 목적지별 정차 시간과 소비전력을 따로 확인해 주세요.';
-      if (speak) say($('draft-status').textContent);
-      return;
+  const hasStopDescription = text => /(?:에어컨|히터|공조|기다리|대기|주차(?:해|하고|중|할|한|를|하))/.test(String(text || ''));
+  function parseStopDuration(text) {
+    const s = String(text || '');
+    if (/(?:\d+|한|두|세|네)\s*(?:~|∼|에서|부터|내지)\s*(?:\d+|한|두|세|네)/.test(s)) return null;
+    const words = {한:1,두:2,세:3,네:4,다섯:5,여섯:6,일곱:7,여덟:8,아홉:9,열:10,십:10,십오:15,이십:20,삼십:30,사십:40,오십:50};
+    const hourMatches = [...s.matchAll(/(\d+(?:\.\d+)?|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*시간/g)];
+    const minuteMatches = [...s.matchAll(/(\d+(?:\.\d+)?|십오|이십|삼십|사십|오십|십)\s*분/g)];
+    if (hourMatches.length > 1 || minuteMatches.length > 1) return null;
+    const number = x => Object.prototype.hasOwnProperty.call(words,x) ? words[x] : Number(x);
+    let hours = hourMatches.length ? number(hourMatches[0][1]) : 0;
+    if (minuteMatches.length && /시간\s*반/.test(s)) return null;
+    if (hourMatches.length && /시간\s*반/.test(s)) hours += 0.5;
+    if (!hourMatches.length && /반\s*시간/.test(s)) hours = 0.5;
+    if (minuteMatches.length) {
+      if (hourMatches.length && !/시간\s*(?:하고\s*)?(?:\d+(?:\.\d+)?|십오|이십|삼십|사십|오십|십)\s*분/.test(s)) return null;
+      hours += number(minuteMatches[0][1]) / 60;
     }
+    return (hourMatches.length || minuteMatches.length || /반\s*시간/.test(s)) && Number.isFinite(hours) && hours >= 0 && hours <= 24 ? hours : null;
+  }
+  window.EvPlanner = {parseStops, parseStopDuration};
+  let stopDraftRevision = null;
+  function previewStop(text, speak) {
+    draft = []; $('apply-draft').hidden = true;
+    const options = $('voice-stop-index'); options.replaceChildren();
+    const blank = document.createElement('option'); blank.value = ''; blank.textContent = '목적지를 선택하세요'; options.append(blank);
+    plan.stops.forEach((p, i) => { const option = document.createElement('option'); option.value = String(i); option.textContent = (i+1) + '. ' + (p.name || '이름 없는 목적지'); options.append(option); });
+    $('voice-stop-hours').value = ''; $('voice-stop-power').value = ''; $('voice-stop-result').textContent = '';
+    const duration = parseStopDuration(text);
+    if (duration !== null) $('voice-stop-hours').value = String(duration);
+    stopDraftRevision = revision;
+    $('voice-stop-draft').hidden = false;
+    $('voice-stop-status').textContent = plan.stops.length
+      ? '인식: ' + String(text).slice(0,500) + '. 적용할 목적지와 시간, 평균 소비전력을 직접 확인하세요.'
+      : '먼저 방문 장소를 일정에 추가해 주세요. 이후 정차 내용을 다시 말씀해 주세요.';
+    $('draft-status').textContent = '정차 계획은 확인 후 적용됩니다. 목적지와 소비전력을 선택해 주세요.';
+    if (speak) say('정차할 목적지와 전기 사용 시간, 소비전력을 확인해 주세요.');
+  }
+  $('voice-stop-cancel').addEventListener('click', () => { stopDraftRevision = null; $('voice-stop-draft').hidden = true; });
+  $('voice-stop-apply').addEventListener('click', () => {
+    const index = $('voice-stop-index').value, hours = $('voice-stop-hours'), power = $('voice-stop-power');
+    if (stopDraftRevision === null || revision !== stopDraftRevision) { $('voice-stop-result').textContent = '일정이 변경됐습니다. 정차 내용을 다시 입력해 주세요.'; return; }
+    if (index === '' || !/^\d+$/.test(index) || !plan.stops[Number(index)] || hours.value === '' || power.value === '' || !hours.checkValidity() || !power.checkValidity()) {
+      $('voice-stop-result').textContent = '목적지와 시간, 평균 소비전력을 모두 확인해 주세요.'; return;
+    }
+    const point = plan.stops[Number(index)]; point.stopHours = Number(hours.value); point.stopPower = Number(power.value);
+    if (!Number.isFinite(point.stopHours) || !Number.isFinite(point.stopPower)) { $('voice-stop-result').textContent = '시간과 전력을 확인해 주세요.'; return; }
+    setStopDirty(true); save(); render();
+    $('apply-stop-energy').click();
+    if (stopDirty) { $('voice-stop-result').textContent = '전체 정차 시간과 입력값을 확인해 주세요.'; return; }
+    stopDraftRevision = null; $('voice-stop-draft').hidden = true;
+    $('draft-status').textContent = point.name + ' 정차 계획을 적용했습니다. 차량 정보와 거리를 확인하고 계획을 다시 계산해 주세요.';
+  });
+  function preview(text, speak) {
+    if (hasStopDescription(text)) { previewStop(text, speak); return; }
     draft = parseStops(text);
     $('draft-status').textContent = draft.length ? '인식한 순서: ' + draft.join(' → ') + '. 장소를 확인한 뒤 적용해 주세요.' : '장소를 나누지 못했습니다. 쉼표나 화살표로 구분해 주세요.';
     $('apply-draft').hidden = !draft.length;
@@ -166,6 +218,7 @@
     const heard = String(e.detail?.text || '').trim();
     if (!heard) return;
     $('voice-status').textContent = '인식: ' + heard;
+    if (hasStopDescription(heard)) { previewStop(heard, true); return; }
     let reply = '';
     if (/(?:일정|계획).*(?:변경|바뀌|바꿀|달라)/.test(heard))
       reply = '변경된 출발지와 경유지를 말씀해 주세요. 장소를 확인한 후 다시 계산하겠습니다.';
@@ -210,7 +263,8 @@
   });
 
   function request(payload) {
-    if (!$('map-consent').checked) return Promise.reject(new Error('외부 지도 서비스 전송에 동의해 주세요.'));
+    if (payload.type === 'weather' && !$('weather-consent').checked) return Promise.reject(new Error('날씨 제공자에게 출발지 좌표를 전송하는 데 동의해 주세요.'));
+    if (payload.type !== 'weather' && !$('map-consent').checked) return Promise.reject(new Error('외부 지도 서비스 전송에 동의해 주세요.'));
     if (!window.HaruNative || !window.HaruNative.mapRequest) return Promise.reject(new Error('설치형 앱의 지도 연결이 필요합니다.'));
     const id = String(Date.now() * 100 + (++serial % 100));
     return new Promise((resolve, reject) => {
@@ -237,8 +291,9 @@
       container.replaceChildren();
       if (!Array.isArray(data) || !data.length) { container.textContent = '검색 결과가 없습니다. 더 구체적인 주소로 다시 검색하세요.'; return; }
       for (const row of data.slice(0, 5)) {
-        const lat = Number(row.lat), lon = Number(row.lon), label = String(row.display_name || '');
-        if (!coordinate({lat, lon}) || !label) continue;
+        if (!row || typeof row !== 'object') continue;
+        const lat = parseCoordinate(row.lat), lon = parseCoordinate(row.lon), label = String(row.display_name || '');
+        if (!coordinate({lat, lon}) || (lat === 0 && lon === 0) || !label) continue;
         container.append(button(label, () => {
           point.lat = lat; point.lon = lon; point.label = label; changed(); render();
           $('map-status').textContent = '장소를 확인했습니다. 모든 경유지를 확인한 뒤 경로를 계산하세요.';
@@ -248,6 +303,19 @@
     } catch (e) { if (at === revision) container.textContent = e.message; }
   }
   $('origin-search').addEventListener('click', () => searchPoint(plan.origin, $('origin-results')));
+  let weatherSequence=0;
+  $('weather-check').addEventListener('click', async () => {
+    if (!coordinate(plan.origin)) { $('weather-status').textContent = '먼저 출발지 검색 결과 또는 확인한 내비 현재 위치를 선택해 주세요.'; return; }
+    const at=revision, sequence=++weatherSequence; $('weather-status').textContent='출발지 날씨를 조회하고 있습니다…';
+    try {
+      const data=await request({type:'weather',lat:plan.origin.lat,lon:plan.origin.lon});
+      if (at !== revision || sequence !== weatherSequence || !$('weather-consent').checked) return;
+      const current=data && data.current, temperature=current && current.temperature_2m, precipitation=current && current.precipitation;
+      if (!Number.isFinite(temperature) || temperature < -100 || temperature > 70 || !Number.isFinite(precipitation) || precipitation < 0 || precipitation > 1000 || typeof current.time !== 'string' || current.time.length > 40) throw new Error('날씨 응답을 확인할 수 없습니다.');
+      $('weather-status').textContent='Open-Meteo 모델 정보 · 기준 '+current.time+' · 기온 '+temperature.toFixed(1)+'°C · 강수 '+precipitation.toFixed(1)+' mm. 예측 전비에는 자동 반영되지 않습니다.';
+    } catch (e) { if (at === revision && sequence === weatherSequence) $('weather-status').textContent=e.message; }
+  });
+  $('weather-consent').addEventListener('change',()=>{if (!$('weather-consent').checked) {weatherSequence++;$('weather-status').textContent='날씨 제공자 좌표 전송 동의가 해제됐습니다.';}});
   function render() {
     $('origin').value = plan.origin.name || '';
     $('origin-results').textContent = describe(plan.origin);
@@ -264,10 +332,11 @@
       const up = button('앞으로', () => { if (i > 0) { [plan.stops[i - 1], plan.stops[i]] = [plan.stops[i], plan.stops[i - 1]]; syncRouteText(); changed(); render(); } }, 'sub');
       const visited = i === 0 ? button('이 장소 방문·정차 완료', () => {
         if (!coordinate(point)) { $('progress-status').textContent = '완료할 장소의 위치를 먼저 확인해 주세요.'; return; }
-        const wasDerived = stopDerived;
+        const wasDerived = stopDerived, hadCharge = $('charge-included').checked;
         plan.origin = {...emptyPoint(point.name), lat:point.lat, lon:point.lon, label:point.label};
         plan.stops.shift(); syncRouteText(); changed();
         $('distance').value = ''; $('charger-distance').value = ''; $('charger-name').value = '';
+        $('charge-included').checked = false; $('charge-added').value = '0'; $('charge-before-idle').value = '';
         distanceFromRoute = false;
         try { localStorage.removeItem('ev-route-distance-derived-v1'); localStorage.setItem('ev-route-distance-invalid-v1','true'); } catch (_) {}
         $('remaining-soc').value = '';
@@ -277,7 +346,7 @@
         else if (plan.stops.length) { $('hours').value = ''; $('power').value = ''; setStopDirty(true); }
         render();
         $('progress-status').textContent = plan.stops.length
-          ? point.name + ' 방문을 완료했습니다. 현재 배터리 잔량과 남은 정차 계획을 확인하고 남은 일정 재계산을 누르세요.'
+          ? point.name + ' 방문을 완료했습니다. 현재 배터리 잔량과 남은 정차 계획을 확인하고 남은 일정 재계산을 누르세요.' + (hadCharge ? ' 이전 충전 계획은 해제했습니다. 남은 충전 계획을 다시 확인하세요.' : '')
           : point.name + ' 방문을 완료했습니다. 남은 목적지가 없습니다.';
       }, 'sub') : null;
       const hours = document.createElement('input'); hours.type = 'number'; hours.min = '0'; hours.max = '24'; hours.step = 'any'; hours.value = point.stopHours; hours.setAttribute('aria-label', '목적지 ' + (i + 1) + ' 차량 전기 사용 시간');
@@ -286,7 +355,7 @@
       const powerLabel = document.createElement('label'); powerLabel.textContent = '그 시간의 평균 소비전력 (kW)'; powerLabel.append(power);
       for (const [field, key] of [[hours, 'stopHours'], [power, 'stopPower']]) field.addEventListener('input', () => {
         const value = field.value === '' ? null : Number(field.value);
-        point[key] = value; setStopDirty(true); save();
+        point[key] = value; revision++; setStopDirty(true); save();
         $('stop-energy-status').textContent = '정차 계획이 변경됐습니다. 정차 에너지 적용 버튼을 다시 눌러 주세요.';
         $('result').textContent = '정차 계획이 변경됐습니다. 정차 에너지를 적용하고 계획을 다시 계산해 주세요.';
         $('charge-result').textContent = '정차 계획이 변경됐습니다. 정차 에너지를 적용하고 충전 계획을 다시 계산해 주세요.';
@@ -310,16 +379,20 @@
   async function roadRoute(points) {
     const data = await request({type:'route', points: points.map(p => ({lat:p.lat, lon:p.lon}))});
     const route = data && data.code === 'Ok' && Array.isArray(data.routes) && data.routes[0];
-    if (!route || !Number.isFinite(route.distance) || route.distance <= 0 || route.distance > 3000000 || !Array.isArray(route.legs) || route.legs.length !== points.length - 1 || route.legs.some(l => !Number.isFinite(l.distance) || l.distance < 0))
+    if (!route || !Number.isFinite(route.distance) || route.distance <= 0 || route.distance > 3000000 || !Array.isArray(route.legs) || route.legs.length !== points.length - 1 || route.legs.some(l => !l || !Number.isFinite(l.distance) || l.distance < 0))
       throw new Error('도로 경로를 계산하지 못했습니다. 장소와 도로 연결을 확인하세요.');
+    const legTotal = route.legs.reduce((sum, leg) => sum + leg.distance, 0);
+    if (!Number.isFinite(legTotal) || Math.abs(legTotal - route.distance) > Math.max(25, route.distance * 0.01))
+      throw new Error('도로 경로의 전체 거리와 구간 거리가 일치하지 않습니다. 다시 조회해 주세요.');
     return route;
   }
   function applyDistance(km) {
     $('distance').value = km.toFixed(1);
     distanceFromRoute = true;
     try { localStorage.setItem('ev-route-distance-derived-v1', 'true'); localStorage.removeItem('ev-route-distance-invalid-v1'); } catch (_) {}
+    $('result').textContent = '차량 정보와 정차·충전 계획을 확인하고 있습니다.';
     $('form').dispatchEvent(new Event('submit', {cancelable:true, bubbles:true}));
-    return $('form').checkValidity();
+    return !!$('result').dataset.predictionId && ($('result').innerText || '').includes('예상 소비');
   }
   $('distance').addEventListener('input', () => {
     routeVersion++;
@@ -375,8 +448,7 @@
       }
       $('soc').value = soc;
       $('soc').dispatchEvent(new Event('input', {bubbles:true}));
-      applyDistance(route.distance / 1000);
-      if (!$('form').checkValidity()) { $('progress-status').textContent = '차량 정보와 정차 계획을 확인하고 다시 계산해 주세요.'; return; }
+      if (!applyDistance(route.distance / 1000)) { $('progress-status').textContent = '차량 정보와 정차·충전 계획을 확인하고 다시 계산해 주세요.'; return; }
       $('progress-status').textContent = '현재 잔량 ' + Number(soc).toFixed(1) + '%와 남은 도로 거리 ' + (route.distance / 1000).toFixed(1) + ' km를 반영했습니다. 공용 지도 경로와 실제 교통은 다를 수 있습니다.';
     } catch (e) { if (at === revision && requestVersion === routeVersion) $('progress-status').textContent = e.message; }
   });
@@ -473,10 +545,10 @@
       if (!anchor) throw new Error('검색할 위치를 선택해 주세요.');
       const data = await request({type:'chargers', lat:anchor.lat, lon:anchor.lon});
       if (at !== revision) return;
-      const stations = (Array.isArray(data.elements) ? data.elements : []).map(e => ({
-        lat: Number(e.lat ?? e.center?.lat), lon: Number(e.lon ?? e.center?.lon),
+      const stations = (Array.isArray(data?.elements) ? data.elements : []).filter(e => e && typeof e === 'object').map(e => ({
+        lat: parseCoordinate(e.lat ?? e.center?.lat), lon: parseCoordinate(e.lon ?? e.center?.lon),
         name: String(e.tags?.name || e.tags?.operator || '이름 없는 충전소')
-      })).filter(coordinate).map(s => ({...s, straight:straightDistance(anchor,s)})).sort((a,b) => a.straight-b.straight).slice(0,6);
+      })).filter(s => coordinate(s) && !(s.lat === 0 && s.lon === 0)).map(s => ({...s, straight:straightDistance(anchor,s)})).sort((a,b) => a.straight-b.straight).slice(0,6);
       host.replaceChildren();
       if (!stations.length) { host.textContent = '공개 지도에서 주변 충전소를 찾지 못했습니다. 다른 위치를 선택하거나 직접 입력해 주세요.'; return; }
       const note = document.createElement('p'); note.textContent = '선택한 위치에서 직선거리 기준입니다. 영업·고장·사용 가능 여부는 확인되지 않았습니다.'; host.append(note);
@@ -496,8 +568,8 @@
             if (current !== revision || requestVersion !== routeVersion) { host.textContent = '일정이나 경로 요청이 변경되어 다시 검색해야 합니다.'; return; }
             $('charger-name').value = station.name;
             $('charger-distance').value = toStation.toFixed(1);
-            applyDistance(km); $('charge-calc').click();
-            host.append(document.createTextNode(' 계산에 반영했습니다. 아래에서 충전 전력과 결과를 확인하세요.'));
+            const calculated = applyDistance(km); $('charge-calc').click();
+            host.append(document.createTextNode(calculated ? ' 계산에 반영했습니다. 아래에서 충전 전력과 결과를 확인하세요.' : ' 경로 거리를 입력했습니다. 차량 정보와 정차·충전 계획을 확인하고 다시 계산하세요.'));
           }, 'sub'));
         } catch (e) { if (current === revision && requestVersion === routeVersion) host.textContent = e.message; }
       })));
@@ -529,24 +601,33 @@
       $('charge-result').textContent = '차량 잔량을 확인하고 충전 계획을 다시 계산해 주세요.';
     }
   });
+  function readSafeHistory() {
+    try {
+      const rows = JSON.parse(localStorage.getItem('ev-day-history-v1') || '[]');
+      if (!Array.isArray(rows) || rows.some(h => !h || typeof h !== 'object' || !Number.isFinite(h.predicted) || h.predicted < 0 || h.predicted > 100 || !Number.isFinite(h.actual) || h.actual < 0 || h.actual > 100)) return null;
+      return rows;
+    } catch (_) { return null; }
+  }
   function historyStats() {
-    let rows = [];
-    try { rows = JSON.parse(localStorage.getItem('ev-day-history-v1') || '[]'); } catch (_) {}
-    if (!Array.isArray(rows)) rows = [];
-    rows = rows.filter(h => h.noCharge && Number.isFinite(h.predicted) && Number.isFinite(h.actual));
-    $('history-stats').textContent = rows.length < 3
-      ? '충전 없이 이동거리가 일치한 확인 기록이 3개 이상이면 과거 예측 오차를 표시합니다.'
-      : '확인 기록 ' + rows.length + '건의 평균 절대 오차 ' + (rows.reduce((sum,h) => sum + Math.abs(h.actual-h.predicted),0)/rows.length).toFixed(1) + '%p. 이 값은 과거 기록이며 다음 일정의 오차를 보장하지 않습니다.';
+    let rows = readSafeHistory();
+    if (!rows) { $('history-stats').textContent = '읽을 수 없는 기록이 있어 통계를 표시하지 않습니다. 원본을 내보내 확인하세요.'; return; }
+    rows = rows.filter(h => h && h.noCharge === true && Number.isFinite(h.predicted) && h.predicted >= 0 && h.predicted <= 100 && Number.isFinite(h.actual) && h.actual >= 0 && h.actual <= 100);
+    if (rows.length < 3) { $('history-stats').textContent = '충전 없이 이동거리가 일치한 확인 기록이 3개 이상이면 과거 예측 오차를 표시합니다.'; return; }
+    const mae = rows.reduce((sum,h) => sum + Math.abs(h.actual-h.predicted),0)/rows.length;
+    const rmse = Math.sqrt(rows.reduce((sum,h) => sum + (h.actual-h.predicted)**2,0)/rows.length);
+    const withReserve = rows.filter(h => h.inputs && Number.isFinite(h.inputs.reserve) && h.inputs.reserve >= 0 && h.inputs.reserve <= 100);
+    const missed = withReserve.filter(h => h.predicted >= h.inputs.reserve && h.actual < h.inputs.reserve).length;
+    const falseAlert = withReserve.filter(h => h.predicted < h.inputs.reserve && h.actual >= h.inputs.reserve).length;
+    $('history-stats').textContent = '확인 기록 ' + rows.length + '건 · 평균 절대 오차 ' + mae.toFixed(1) + '%p · RMSE ' + rmse.toFixed(1) + '%p. 목표 잔량 기록 ' + withReserve.length + '건 중 부족 미감지 ' + missed + '건 · 부족 오탐 ' + falseAlert + '건. 이 값은 과거 사용자 확인 기록이며 다음 일정의 정확도를 보장하지 않습니다.';
   }
   $('save-history').addEventListener('click', historyStats);
   $('delete-history').addEventListener('click', historyStats);
   $('apply-eff').addEventListener('click', () => {
-    let rows = [];
-    try { rows = JSON.parse(localStorage.getItem('ev-day-history-v1') || '[]'); } catch (_) {}
-    if (!Array.isArray(rows)) rows = [];
+    let rows = readSafeHistory();
+    if (!rows) { $('eff-suggestion').textContent = '읽을 수 없는 기록이 있어 참고 전비를 적용하지 않습니다. 원본을 내보내 확인하세요.'; return; }
     const values = rows.flatMap(h => {
-      const v = h.inputs;
-      if (!h.noCharge || !v || ![v.soc,v.cap,v.distance,v.hours,v.power,h.actual].every(Number.isFinite) || v.distance <= 0 || h.actual >= v.soc) return [];
+      const v = h && h.inputs;
+      if (!h || !h.noCharge || !v || ![v.soc,v.cap,v.distance,v.hours,v.power,h.actual].every(Number.isFinite) || v.distance <= 0 || h.actual >= v.soc) return [];
       const energy = (v.soc-h.actual)*v.cap/100-v.hours*v.power;
       const efficiency = v.distance/energy;
       return energy > 0 && efficiency >= 0.1 && efficiency <= 20 ? [efficiency] : [];
@@ -560,9 +641,11 @@
   });
   $('export-history').addEventListener('click', () => {
     if (!window.HaruNative || !window.HaruNative.exportData) { $('eff-suggestion').textContent = '설치형 앱에서 기록을 내보낼 수 있습니다.'; return; }
-    let rows = [];
-    try { rows = JSON.parse(localStorage.getItem('ev-day-history-v1') || '[]'); } catch (_) {}
-    window.HaruNative.exportData(JSON.stringify({version:1,history:Array.isArray(rows)?rows:[]}));
+    let raw = null;
+    try { raw = localStorage.getItem('ev-day-history-v1'); } catch (_) { $('eff-suggestion').textContent = '기록을 읽지 못했습니다.'; return; }
+    let rows;
+    try { rows = JSON.parse(raw || '[]'); } catch (_) { rows = null; }
+    window.HaruNative.exportData(JSON.stringify({version:1,history:Array.isArray(rows)?rows:null,originalStorage:raw}));
     $('eff-suggestion').textContent = '공유할 앱을 선택하세요. 경유지 등 개인 정보가 포함됩니다.';
   });
   $('reminder-set').addEventListener('click', () => {
@@ -632,7 +715,7 @@
   function currentForecast() {
     let p;
     try { p = JSON.parse(localStorage.getItem('ev-day-last-prediction-v1') || 'null'); } catch (_) {}
-    if (!p || !p.inputs || !Number.isFinite(p.raw) || !Number.isFinite(p.inputs.reserve) || !($('result').innerText || '').includes('예상 소비')) return null;
+    if (!p || !p.id || p.id !== $('result').dataset.predictionId || !p.inputs || !Number.isFinite(p.raw) || !Number.isFinite(p.inputs.reserve) || !($('result').innerText || '').includes('예상 소비')) return null;
     return p;
   }
   $('push-test').addEventListener('click', () => sendPush('test'));
