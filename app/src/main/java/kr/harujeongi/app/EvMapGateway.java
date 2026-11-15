@@ -94,7 +94,7 @@ final class EvMapGateway {
   HttpURLConnection c = (HttpURLConnection)new URL(address).openConnection();
   try {
    c.setConnectTimeout(6000); c.setReadTimeout(12000); c.setInstanceFollowRedirects(false);
-   c.setRequestProperty("User-Agent", "Harujeongi/0.1 (https://github.com/rwopoja/MyCabin-Pleos)");
+   c.setRequestProperty("User-Agent", "Harujeongi/0.1 (https://github.com/rwopoja/Harujeongi-Pleos)");
    c.setRequestProperty("Accept", "application/json");
    if (form != null) {
     c.setRequestMethod("POST"); c.setDoOutput(true);

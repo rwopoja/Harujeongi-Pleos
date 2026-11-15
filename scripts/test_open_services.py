@@ -7,7 +7,7 @@ import urllib.request
 
 OUT = pathlib.Path("runtime-artifacts")
 OUT.mkdir(exist_ok=True)
-HEADERS = {"User-Agent": "Harujeongi/0.1 (https://github.com/rwopoja/MyCabin-Pleos)", "Accept": "application/json"}
+HEADERS = {"User-Agent": "Harujeongi/0.1 (https://github.com/rwopoja/Harujeongi-Pleos)", "Accept": "application/json"}
 tests = {
     "geocode": (
         "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode({

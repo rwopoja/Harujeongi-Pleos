@@ -4,7 +4,7 @@
 
 ## 실행 및 확인
 
-- APK와 Android 실행 검증 결과: [Actions 빌드 목록](https://github.com/rwopoja/MyCabin-Pleos/actions/workflows/submission-demo.yml). 대상 커밋의 성공한 실행에서 APK 산출물을 확인합니다. 새 패키지의 빌드 결과는 해당 커밋의 검사에서 따로 확인해야 합니다.
+- APK와 Android 실행 검증 결과: [Actions 빌드 목록](https://github.com/rwopoja/Harujeongi-Pleos/actions/workflows/submission-demo.yml). 대상 커밋의 성공한 실행에서 APK 산출물을 확인합니다. 새 패키지의 빌드 결과는 해당 커밋의 검사에서 따로 확인해야 합니다.
 - Android 9(API 28) 이상 기기 또는 에뮬레이터에 설치합니다. Pleos 전용 SDK 기능은 Pleos Connect 환경 및 해당 서비스·권한이 필요합니다. 서명이 다른 이전 설치본은 제거해야 할 수 있으며 이때 앱 내부 기록이 삭제됩니다.
 - 일반 PC에서 화면 확인: `python -m http.server 8080 --directory web` 실행 후 `http://localhost:8080/ev-day.html`을 엽니다. 브라우저에서는 Android 음성·알림·지도 연결을 사용할 수 없습니다.
 - 소스 빌드: JDK 17, Android SDK Platform 35 및 Build Tools 35.0.0을 설치하고 `ANDROID_HOME`, `JAVA_HOME`을 지정한 뒤 `python scripts/build_local.py`를 실행합니다. Pleos Nexus와 Maven 저장소 접근이 필요합니다. 결과는 `apk/김재윤_하루전기_release.apk`입니다. 개발용 키는 로컬에서 생성하므로 안정적으로 업데이트·배포하려면 본인이 보관하는 키를 사용해야 합니다.
