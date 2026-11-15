@@ -23,7 +23,7 @@ jobs:
       - name: Install build tools and build current APK
         run: |
           sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-          rm -f 'apk/김재윤_마이캐빈_release.apk'
+          rm -f 'apk/김재윤_하루전기_release.apk'
           python3 scripts/build_local.py
       - name: Download official Pleos Connect 2.1 image
         run: |
@@ -49,10 +49,21 @@ jobs:
           (avd/'MyCabin_Pleos.ini').write_text('avd.ini.encoding=UTF-8\npath='+str(d)+'\ntarget=android-34\n')
           (d/'config.ini').write_text('AvdId=MyCabin_Pleos\nabi.type=x86_64\nimage.sysdir.1='+str(image_dir)+'/\nhw.cpu.arch=x86_64\nhw.cpu.ncore=4\nhw.ramSize=4096\nhw.lcd.width=1920\nhw.lcd.height=1080\nhw.lcd.density=160\nhw.gpu.enabled=yes\nhw.gpu.mode=swiftshader_indirect\ndisk.dataPartition.size=4096M\n')
           PY
-          nohup "$ANDROID_HOME/emulator/emulator" -avd MyCabin_Pleos -no-window -no-audio -gpu swiftshader_indirect -no-snapshot -no-boot-anim > /tmp/pleos-emulator.log 2>&1 &
-          timeout 180 adb wait-for-device || { tail -200 /tmp/pleos-emulator.log; exit 1; }
-          for i in $(seq 1 120); do if [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; then exit 0; fi; sleep 5; done
-          tail -200 /tmp/pleos-emulator.log
+          adb start-server
+          mkfifo /tmp/pleos-serial
+          exec 8<>/tmp/pleos-serial
+          nohup "$ANDROID_HOME/emulator/emulator" -avd MyCabin_Pleos -no-window -no-audio -gpu swiftshader_indirect -no-snapshot -no-boot-anim -shell < /tmp/pleos-serial > /tmp/pleos-emulator.log 2>&1 &
+          for i in $(seq 1 72); do
+            if [ -s "$HOME/.android/adbkey.pub" ] && [ $((i % 18)) -eq 1 ]; then
+              printf 'echo PLEOS_CONSOLE_CHECK; id; mkdir -p /data/misc/adb; echo "%s" >> /data/misc/adb/adb_keys; chmod 640 /data/misc/adb/adb_keys; setprop ctl.restart adbd\n' "$(cat "$HOME/.android/adbkey.pub")" >&8
+            fi
+            if adb devices | grep -Eq '^emulator-[0-9]+[[:space:]]+device$' && [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; then
+              echo 'Pleos ADB and Android boot ready'; exit 0
+            fi
+            sleep 5
+          done
+          grep -E 'PLEOS_CONSOLE_CHECK|uid=|Permission denied|Error|ERROR' /tmp/pleos-emulator.log | tail -60 || true
+          tail -100 /tmp/pleos-emulator.log
           exit 1
       - name: Install and capture actual Pleos screen
         run: |
@@ -60,7 +71,7 @@ jobs:
           adb shell wm size > pleos-evidence/screen-size.txt
           adb shell wm density > pleos-evidence/screen-density.txt
           adb shell getprop > pleos-evidence/properties.txt
-          adb install -r 'apk/김재윤_마이캐빈_release.apk'
+          adb install -r 'apk/김재윤_하루전기_release.apk'
           adb shell am start -W -n kr.mycabin.app/.MainActivity
           sleep 30
           adb shell uiautomator dump /sdcard/pleos-tree.xml
