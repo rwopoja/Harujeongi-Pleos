@@ -77,6 +77,12 @@
   const uxObserver = new MutationObserver(() => { if (uxRestricted) applyUx(); });
   uxObserver.observe(document.body, {childList:true,subtree:true});
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(plan)); } catch (_) { $('map-status').textContent = '계획을 기기에 저장하지 못했습니다.'; } };
+  const syncRouteText = () => {
+    const names = plan.stops.map(p => p.name.trim()).filter(Boolean);
+    $('route').value = names.join(' → ');
+    if (names.length) $('save-route').click();
+    else { try { localStorage.removeItem('ev-day-route-v1'); } catch (_) {} }
+  };
   const changed = () => {
     revision++;
     if (distanceFromRoute) {
@@ -233,10 +239,10 @@
       const input = document.createElement('input'); input.value = point.name; input.maxLength = 150; input.placeholder = '장소명 또는 주소';
       input.setAttribute('aria-label', '목적지 ' + (i + 1));
       const results = document.createElement('div'); results.textContent = describe(point);
-      input.addEventListener('input', () => { point.name = input.value.trim(); point.lat = null; point.lon = null; point.label = ''; results.textContent = describe(point); changed(); });
+      input.addEventListener('input', () => { point.name = input.value.trim(); point.lat = null; point.lon = null; point.label = ''; results.textContent = describe(point); syncRouteText(); changed(); });
       const search = button('이 장소 검색', () => searchPoint(point, results), 'sub');
-      const remove = button('삭제', () => { plan.stops.splice(i, 1); stopStructureChanged(); changed(); render(); }, 'sub');
-      const up = button('앞으로', () => { if (i > 0) { [plan.stops[i - 1], plan.stops[i]] = [plan.stops[i], plan.stops[i - 1]]; changed(); render(); } }, 'sub');
+      const remove = button('삭제', () => { plan.stops.splice(i, 1); syncRouteText(); stopStructureChanged(); changed(); render(); }, 'sub');
+      const up = button('앞으로', () => { if (i > 0) { [plan.stops[i - 1], plan.stops[i]] = [plan.stops[i], plan.stops[i - 1]]; syncRouteText(); changed(); render(); } }, 'sub');
       const hours = document.createElement('input'); hours.type = 'number'; hours.min = '0'; hours.max = '24'; hours.step = 'any'; hours.value = point.stopHours; hours.setAttribute('aria-label', '목적지 ' + (i + 1) + ' 차량 전기 사용 시간');
       const power = document.createElement('input'); power.type = 'number'; power.min = '0'; power.max = '20'; power.step = 'any'; power.value = point.stopPower; power.setAttribute('aria-label', '목적지 ' + (i + 1) + ' 정차 평균 소비전력');
       const hoursLabel = document.createElement('label'); hoursLabel.textContent = '차량에서 전기를 쓰는 시간 (시간)'; hoursLabel.append(hours);
@@ -315,7 +321,7 @@
     const h = Math.sin(dlat/2)**2 + Math.cos(radians(a.lat))*Math.cos(radians(b.lat))*Math.sin(dlon/2)**2;
     return 12742 * Math.asin(Math.min(1, Math.sqrt(h)));
   }
-  let naviLocation = null;
+  let naviLocation = null, pendingDestination = null;
   $('connect-navi').addEventListener('click', () => {
     if (!window.HaruNative || !window.HaruNative.observeNavi) {
       $('navi-status').textContent = 'Pleos 설치형 앱에서 사용할 수 있습니다.'; return;
@@ -329,16 +335,21 @@
       naviLocation = {lat:value.lat,lon:value.lon,address:String(value.address || ''),receivedAt:Date.now()};
       $('navi-location-status').textContent = '내비 현재 위치를 받았습니다. 출발지로 사용할지 선택하세요.';
       $('use-navi-location').hidden = false;
-    } else if (data.event === 'destination' && value && Number.isFinite(value.lat) && Number.isFinite(value.lon)) {
-      const expected = plan.stops.at(-1);
-      if (coordinate(expected) && straightDistance(expected, value) > 0.5) {
-        $('navi-status').textContent = '내비 목적지 ' + String(value.name || '목적지') + '가 저장된 마지막 장소와 다릅니다. 일정이 바뀌었나요?';
+    } else if (data.event === 'destination' && coordinate(value) && !(value.lat === 0 && value.lon === 0)) {
+      const verified = plan.stops.filter(coordinate);
+      const matches = verified.some(stop => straightDistance(stop, value) <= 0.5);
+      pendingDestination = null; $('navi-add-destination').hidden = true;
+      if (verified.length && !matches) {
+        pendingDestination = {name:String(value.name || '내비 목적지').slice(0,150),lat:value.lat,lon:value.lon,receivedAt:Date.now()};
+        $('navi-status').textContent = '내비 목적지 ' + pendingDestination.name + '가 확인된 일정 장소와 다릅니다. 일정이 바뀌었나요?';
+        $('navi-add-destination').hidden = false;
         $('navi-change').hidden = false; $('navi-keep').hidden = false;
       } else {
-        $('navi-status').textContent = '내비 목적지: ' + String(value.name || '이름 없음') + (coordinate(expected) ? ' · 저장한 마지막 장소와 일치' : ' · 저장한 마지막 장소를 확인해 주세요.');
+        $('navi-status').textContent = '내비 목적지: ' + String(value.name || '이름 없음') + (matches ? ' · 확인된 일정 장소와 일치' : ' · 저장한 일정 장소를 먼저 확인해 주세요.');
         $('navi-change').hidden = true; $('navi-keep').hidden = true;
       }
     } else if (data.event === 'waypoint_changed') {
+      pendingDestination = null; $('navi-add-destination').hidden = true;
       $('navi-status').textContent = '내비 경유지가 변경됐습니다. 저장한 일정도 바뀌었나요?';
       $('navi-change').hidden = false; $('navi-keep').hidden = false;
     } else if (data.event === 'error' || data.event === 'status' || data.event === 'changed') {
@@ -346,8 +357,27 @@
     }
   });
   $('navi-change').addEventListener('click', () => {
+    pendingDestination = null; $('navi-add-destination').hidden = true;
     $('navi-change').hidden = true; $('navi-keep').hidden = true;
     $('voice-route').click(); $('voice-status').scrollIntoView({behavior:'smooth',block:'center'});
+  });
+  $('navi-add-destination').addEventListener('click', () => {
+    if (!pendingDestination || Date.now() - pendingDestination.receivedAt > 120000) {
+      pendingDestination = null; $('navi-add-destination').hidden = true;
+      $('navi-status').textContent = '목적지 정보가 오래됐습니다. 내비 연결 및 일정 확인을 다시 눌러 주세요.'; return;
+    }
+    if (plan.stops.length >= 8) { $('navi-status').textContent = '목적지는 최대 8개입니다. 기존 장소를 정리해 주세요.'; return; }
+    if (plan.stops.some(p => coordinate(p) && straightDistance(p,pendingDestination) <= 0.5)) {
+      pendingDestination = null; $('navi-add-destination').hidden = true;
+      $('navi-status').textContent = '이미 확인된 일정에 있는 장소입니다.'; return;
+    }
+    const p = pendingDestination;
+    plan.stops.unshift({...emptyPoint(p.name),lat:p.lat,lon:p.lon,label:'Pleos 내비 목적지 · '+p.name});
+    pendingDestination = null; $('navi-add-destination').hidden = true;
+    $('navi-change').hidden = true; $('navi-keep').hidden = true;
+    stopStructureChanged();
+    syncRouteText(); changed(); render();
+    $('navi-status').textContent = '기존 계획 맨 앞에 목적지를 추가했습니다. 이미 방문한 장소를 정리하고 현재 위치를 확인한 뒤 도로 경로를 다시 계산하세요.';
   });
   $('use-navi-location').addEventListener('click', () => {
     if (!naviLocation || Date.now() - naviLocation.receivedAt > 120000) {
@@ -358,6 +388,7 @@
     $('navi-location-status').textContent = '현재 위치를 출발지로 선택했습니다. 외부 도로 경로 계산 시 좌표가 전송됩니다.';
   });
   $('navi-keep').addEventListener('click', () => {
+    pendingDestination = null; $('navi-add-destination').hidden = true;
     $('navi-change').hidden = true; $('navi-keep').hidden = true;
     $('navi-status').textContent = '저장한 일정을 유지합니다. 현재 위치와 남은 거리를 확인해 주세요.';
   });

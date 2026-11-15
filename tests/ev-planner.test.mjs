@@ -113,6 +113,21 @@ assert.equal($('navi-change').hidden,false);
 w.dispatchEvent(new w.CustomEvent('ev-navi',{detail:{event:'destination',value:{name:'서울역',lat:37.5547,lon:126.9707}}}));
 assert.match($('navi-status').textContent,/일치/);
 assert.equal($('navi-change').hidden,true);
+// An unexpected destination requires explicit confirmation before any mutation.
+w.dispatchEvent(new w.CustomEvent('ev-navi',{detail:{event:'destination',value:{name:'서초 목적지',lat:37.50,lon:127.03}}}));
+assert.equal($('points').children.length,1);
+assert.equal($('navi-add-destination').hidden,false);
+$('navi-add-destination').click();
+assert.equal($('points').children.length,2);
+assert.match($('route').value,/서초 목적지 → 서울역/);
+assert.match($('navi-status').textContent,/이미 방문한 장소/);
+assert.equal($('navi-add-destination').hidden,true);
+// A destination that is an intermediate stop is not a change.
+w.dispatchEvent(new w.CustomEvent('ev-navi',{detail:{event:'destination',value:{name:'서초 목적지',lat:37.50,lon:127.03}}}));
+assert.match($('navi-status').textContent,/일치/);
+assert.equal($('navi-add-destination').hidden,true);
+option($('points').firstElementChild,'삭제').click();
+assert.equal($('route').value,'서울역');
 
 $('route-search').click();
 let call = calls.at(-1);
