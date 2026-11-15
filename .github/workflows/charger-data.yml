@@ -16,6 +16,10 @@ jobs:
           curl -fL --max-time 60 'https://www.data.go.kr/data/15102458/fileData.do' -o portal-page || true
           wc -c portal-page || true
           grep -iE 'fileDownload|atchFileId|fileDetailSn|csv' portal-page | head -40 || true
+          for url in 'https://overpass.private.coffee/api/status' 'https://overpass-api.de/api/status' 'https://maps.mail.ru/osm/tools/overpass/api/status'; do
+            echo "Checking $url"
+            curl -4 -sS -I --connect-timeout 5 --max-time 8 "$url" || true
+          done
           file charger-data
           wc -c charger-data
           head -c 800 charger-data || true
