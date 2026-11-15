@@ -348,11 +348,19 @@
         $('navi-status').textContent = '내비 목적지: ' + String(value.name || '이름 없음') + (matches ? ' · 확인된 일정 장소와 일치' : ' · 저장한 일정 장소를 먼저 확인해 주세요.');
         $('navi-change').hidden = true; $('navi-keep').hidden = true;
       }
+    } else if (data.event === 'destination') {
+      pendingDestination = null; $('navi-add-destination').hidden = true;
+      $('navi-change').hidden = true; $('navi-keep').hidden = true;
+      $('navi-status').textContent = '내비 목적지 좌표를 확인할 수 없습니다. 다시 조회해 주세요.';
     } else if (data.event === 'waypoint_changed') {
       pendingDestination = null; $('navi-add-destination').hidden = true;
       $('navi-status').textContent = '내비 경유지가 변경됐습니다. 저장한 일정도 바뀌었나요?';
       $('navi-change').hidden = false; $('navi-keep').hidden = false;
     } else if (data.event === 'error' || data.event === 'status' || data.event === 'changed') {
+      if (data.event !== 'status') {
+        pendingDestination = null; $('navi-add-destination').hidden = true;
+        $('navi-change').hidden = true; $('navi-keep').hidden = true;
+      }
       $('navi-status').textContent = String(value || '내비 상태를 확인해 주세요.');
     }
   });
