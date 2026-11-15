@@ -131,6 +131,13 @@
     plan.stops.push(emptyPoint()); changed(); render();
   });
   $('origin').value = plan.origin.name || '';
+  try {
+    const provider = localStorage.getItem('ev-geocode-provider-v1');
+    if (provider) $('geocode-endpoint').value = provider;
+  } catch (_) {}
+  $('geocode-endpoint').addEventListener('change', () => {
+    try { localStorage.setItem('ev-geocode-provider-v1', $('geocode-endpoint').value.trim()); } catch (_) {}
+  });
   $('origin').addEventListener('input', () => {
     plan.origin = emptyPoint($('origin').value.trim()); $('origin-results').replaceChildren(); changed();
   });
@@ -158,7 +165,7 @@
     if (!query) { container.textContent = '장소명이나 주소를 입력해 주세요.'; return; }
     const at = revision; container.textContent = '장소 검색 중…';
     try {
-      const data = await request({type:'geocode', query});
+      const data = await request({type:'geocode', query, endpoint:$('geocode-endpoint').value.trim()});
       if (at !== revision) return;
       container.replaceChildren();
       if (!Array.isArray(data) || !data.length) { container.textContent = '검색 결과가 없습니다. 더 구체적인 주소로 다시 검색하세요.'; return; }

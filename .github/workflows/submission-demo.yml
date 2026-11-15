@@ -44,6 +44,14 @@ jobs:
           sha256sum 'apk/김재윤_하루전기_release.apk'
       - name: Inspect EV battery SDK signatures
         run: javap -classpath /tmp/mycabin-deps/Vehicle-2.3.2-unpacked/classes.jar ai.pleos.playground.vehicle.api.EvBattery
+      - name: Package reproducible local build tools
+        run: |
+          tar -czf /tmp/ev-build-support.tgz -C "$ANDROID_HOME" build-tools/35.0.0 platforms/android-35/android.jar -C /tmp mycabin-deps -C "$GITHUB_WORKSPACE" app/src web scripts/build_local.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ev-local-build-support
+          path: /tmp/ev-build-support.tgz
+          retention-days: 7
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -57,7 +65,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           emulator-boot-timeout: 600
-          script: python3 scripts/smoke_android.py
+          script: python3 scripts/smoke_android.py && python3 scripts/smoke_android_map.py
       - name: Upload signed APK and runtime evidence
         uses: actions/upload-artifact@v4
         if: always()

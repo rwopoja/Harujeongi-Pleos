@@ -10,6 +10,8 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -20,6 +22,9 @@ final class EvMapGateway {
  private final ExecutorService worker = Executors.newSingleThreadExecutor();
  private volatile boolean closed;
  private long lastGeocode;
+ private final LinkedHashMap<String, JSONArray> geocodeCache = new LinkedHashMap<String, JSONArray>(32, 0.75f, true) {
+  @Override protected boolean removeEldestEntry(Map.Entry<String, JSONArray> entry) { return size() > 100; }
+ };
  EvMapGateway(WebView web) { this.web = web; }
 
  void request(String id, String raw) {
@@ -31,11 +36,15 @@ final class EvMapGateway {
     if ("geocode".equals(type)) {
      String query = request.getString("query").trim();
      if (query.length() < 1 || query.length() > 150) throw new IllegalArgumentException("검색어 길이를 확인하세요.");
+     String endpoint = geocodeEndpoint(request.optString("endpoint", "https://nominatim.openstreetmap.org/search"));
+     String key = endpoint + "\n" + query;
+     if (geocodeCache.containsKey(key)) { emit(id, new JSONObject().put("ok", true).put("data", geocodeCache.get(key))); return; }
      long delay = 1200L - (System.currentTimeMillis() - lastGeocode);
      if (delay > 0) Thread.sleep(delay);
      lastGeocode = System.currentTimeMillis();
-     body = get("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=kr&q=" + URLEncoder.encode(query, "UTF-8"), null);
-     emit(id, new JSONObject().put("ok", true).put("data", new JSONArray(body)));
+     body = get(endpoint + "?format=jsonv2&limit=5&countrycodes=kr&q=" + URLEncoder.encode(query, "UTF-8"), null);
+     JSONArray matches = new JSONArray(body); geocodeCache.put(key, matches);
+     emit(id, new JSONObject().put("ok", true).put("data", matches));
     } else if ("route".equals(type)) {
      JSONArray points = request.getJSONArray("points");
      if (points.length() < 2 || points.length() > 10) throw new IllegalArgumentException("출발지와 목적지를 확인하세요.");
@@ -69,6 +78,17 @@ final class EvMapGateway {
  private static void validate(double lat, double lon) {
   if (!Double.isFinite(lat) || !Double.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180)
    throw new IllegalArgumentException("좌표 오류");
+ }
+ private static String geocodeEndpoint(String value) throws Exception {
+  if (value == null || value.length() > 250) throw new IllegalArgumentException("invalid provider");
+  java.net.URI uri = new java.net.URI(value.trim());
+  String host = uri.getHost();
+  if (!"https".equalsIgnoreCase(uri.getScheme()) || host == null || uri.getUserInfo() != null ||
+      uri.getQuery() != null || uri.getFragment() != null || !"/search".equals(uri.getPath()) ||
+      (uri.getPort() != -1 && uri.getPort() != 443) || host.matches("[0-9.]+") || host.contains(":") ||
+      host.equalsIgnoreCase("localhost") || host.toLowerCase(Locale.ROOT).endsWith(".local"))
+   throw new IllegalArgumentException("invalid provider");
+  return "https://" + host + "/search";
  }
  private static String get(String address, String form) throws Exception {
   HttpURLConnection c = (HttpURLConnection)new URL(address).openConnection();
