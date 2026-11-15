@@ -9,6 +9,8 @@
 - 일반 PC에서 화면 확인: `python -m http.server 8080 --directory web` 실행 후 `http://localhost:8080/ev-day.html`을 엽니다. 브라우저에서는 Android 음성·알림·지도 연결을 사용할 수 없습니다.
 - 소스 빌드: JDK 17, Android SDK Platform 35 및 Build Tools 35.0.0을 설치하고 `ANDROID_HOME`, `JAVA_HOME`을 지정한 뒤 `python scripts/build_local.py`를 실행합니다. Pleos Nexus와 Maven 저장소 접근이 필요합니다. 결과는 `apk/김재윤_하루전기_release.apk`입니다. 개발용 키는 로컬에서 생성하므로 안정적으로 업데이트·배포하려면 본인이 보관하는 키를 사용해야 합니다.
 
+빌드 스크립트는 저장소에 기록된 의존성 SHA-256과 내려받은 파일을 비교하며, 불일치하거나 확인된 해시가 없으면 빌드를 중단합니다. 외부 저장소의 요청 제한이 발생하면 제한된 횟수만 대기 후 재시도합니다.
+
 ## 사용 순서
 
 1. 배터리 잔량, 사용 가능 용량, 예상 전비, 목표 여유, 정차 시간과 소비전력을 입력합니다. Pleos 배터리 조회 버튼은 실제 지원 환경에서만 응답할 수 있으며, 연결 실패 시 수동 입력합니다.

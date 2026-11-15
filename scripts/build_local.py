@@ -2,7 +2,7 @@
 Dependencies are downloaded from vendor Maven repositories; a dependency SHA256 manifest is written.
 Signing keys are local only and never copied into the repository.
 """
-import os,sys,pathlib,urllib.request,zipfile,subprocess,hashlib,json,shutil,concurrent.futures,time
+import os,sys,pathlib,urllib.request,urllib.error,zipfile,subprocess,hashlib,json,shutil,concurrent.futures,time,random
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 SDK=pathlib.Path(os.environ['ANDROID_HOME']);JDK=pathlib.Path(os.environ['JAVA_HOME'])
 TOOLS=SDK/'build-tools/35.0.0';ANDROID=SDK/'platforms/android-35/android.jar'
@@ -23,20 +23,29 @@ def fetch(c):
  base='https://nexus-playground.pleos.ai/repository/maven-releases/' if g.startswith('ai.pleos') else 'https://dl.google.com/dl/android/maven2/' if g.startswith('androidx') else 'https://repo.maven.apache.org/maven2/'
  p=CACHE/f'{a}-{v}.{ext}'
  if not p.exists():
-  for attempt in range(3):
+  for attempt in range(5):
    try:
     urllib.request.urlretrieve(base+rel,p)
     break
    except Exception as exc:
     print(f'Dependency download failed: {base+rel} ({type(exc).__name__}: {exc}); attempt {attempt+1}',file=sys.stderr,flush=True)
     if p.exists():p.unlink()
-    if attempt==2:raise
-    time.sleep(2**attempt)
+    if attempt==4:raise
+    delay = min(30, 2**(attempt+1)) + random.random()
+    if isinstance(exc, urllib.error.HTTPError) and exc.code == 429:
+     retry = exc.headers.get('Retry-After', '')
+     if retry.isdigit():
+      if int(retry) > 60: raise
+      delay = max(delay, int(retry))
+    time.sleep(delay)
  return c,p,base+rel
-results=list(concurrent.futures.ThreadPoolExecutor(max_workers=8).map(fetch,COORDS))
+results=list(concurrent.futures.ThreadPoolExecutor(max_workers=2).map(fetch,COORDS))
 jars=[];dep_resources=[];metadata=[]
+expected={item['coordinate']:item['sha256'] for item in json.loads((ROOT/'docs/dependency-sha256.json').read_text())}
 for c,p,u in results:
- metadata.append({'coordinate':':'.join(c[:3]),'url':u,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+ coordinate=':'.join(c[:3]);digest=hashlib.sha256(p.read_bytes()).hexdigest()
+ if expected.get(coordinate)!=digest:raise RuntimeError('Dependency checksum mismatch or missing approved checksum: '+coordinate)
+ metadata.append({'coordinate':coordinate,'url':u,'sha256':digest})
  if p.suffix=='.jar':jars.append(p)
  else:
   target=CACHE/(p.stem+'-unpacked');target.mkdir(exist_ok=True)

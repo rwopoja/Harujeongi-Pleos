@@ -17,6 +17,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Cache verified build dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            /tmp/harujeongi-deps/*.aar
+            /tmp/harujeongi-deps/*.jar
+          key: harujeongi-deps-${{ runner.os }}-${{ hashFiles('docs/dependency-sha256.json') }}
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
