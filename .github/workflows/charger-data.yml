@@ -10,25 +10,27 @@ jobs:
   inspect:
     runs-on: ubuntu-24.04
     steps:
-      - name: Retrieve public charger location CSV
+      - name: Request the official published dataset
         run: |
-          curl -fL --retry 2 --max-time 90 'https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000002889115&fileDetailSn=1&insertDataPrcus=N' -o charger-data
-          curl -fL --max-time 60 'https://www.data.go.kr/data/15102458/fileData.do' -o portal-page || true
-          curl -fL --max-time 60 'https://www.data.go.kr/js/biz/datset/script_fileDetail.js' -o portal.js || true
-          wc -c portal-page portal.js || true
-          grep -n -A75 -B3 'fn_fileDataDown' portal.js | head -200 || true
-          grep -iE 'fileDownload|atchFileId|fileDetailSn|csv' portal-page | head -40 || true
-          for url in 'https://overpass.private.coffee/api/status' 'https://overpass-api.de/api/status' 'https://maps.mail.ru/osm/tools/overpass/api/status'; do
-            echo "Checking $url"
-            curl -4 -sS -I --connect-timeout 5 --max-time 8 "$url" || true
-          done
-          file charger-data
-          wc -c charger-data
-          head -c 800 charger-data || true
+          curl -fsSL -c cookies --max-time 60 'https://www.data.go.kr/data/15102458/fileData.do' -o portal-page
+          curl -fsSL -b cookies -e 'https://www.data.go.kr/data/15102458/fileData.do' -X POST 'https://www.data.go.kr/tcs/dss/selectFileDataDownload.do' --data-urlencode 'publicDataPk=15102458' --data-urlencode 'publicDataDetailPk=uddi:4547fddc-cbd3-4b78-8b92-c3be4c26e5ec' --data-urlencode 'atchFileId=' --data-urlencode 'fileDetailSn=1' --data-urlencode 'publicDataTyCode=PR0051' --data-urlencode 'url=/tcs/dss/selectFileDataDownload.do' -o response.json || true
+          python3 - <<'PY'
+          import json,pathlib,urllib.parse
+          try:
+            obj=json.loads(pathlib.Path('response.json').read_text())
+            print('Dataset response status:',obj.get('status'), 'error:',obj.get('error'))
+            if obj.get('status') and obj.get('atchFileId'):
+              q=urllib.parse.urlencode({'atchFileId':obj['atchFileId'],'fileDetailSn':obj.get('fileDetailSn',1),'insertDataPrcus':'N'})
+              pathlib.Path('download-url').write_text('https://www.data.go.kr/cmm/cmm/fileDownload.do?'+q)
+          except Exception as e: print('Dataset lookup failed:',str(e))
+          PY
+          if [ -f download-url ]; then curl -fsSL -b cookies -e 'https://www.data.go.kr/data/15102458/fileData.do' --max-time 90 "$(cat download-url)" -o charger-data || true; fi
+          test ! -f charger-data || { wc -c charger-data; file charger-data; }
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: kepco-public-charger-data
           path: |
             charger-data
-            portal-page
-            portal.js
+            response.json
+            download-url

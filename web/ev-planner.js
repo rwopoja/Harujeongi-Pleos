@@ -235,6 +235,7 @@
     const h = Math.sin(dlat/2)**2 + Math.cos(radians(a.lat))*Math.cos(radians(b.lat))*Math.sin(dlon/2)**2;
     return 12742 * Math.asin(Math.min(1, Math.sqrt(h)));
   }
+  let naviLocation = null;
   $('connect-navi').addEventListener('click', () => {
     if (!window.CabinNative || !window.CabinNative.observeNavi) {
       $('navi-status').textContent = 'Pleos 설치형 앱에서 사용할 수 있습니다.'; return;
@@ -244,7 +245,11 @@
   });
   window.addEventListener('ev-navi', event => {
     const data = event.detail || {}, value = data.value;
-    if (data.event === 'destination' && value && Number.isFinite(value.lat) && Number.isFinite(value.lon)) {
+    if (data.event === 'location' && coordinate(value) && !(value.lat === 0 && value.lon === 0)) {
+      naviLocation = {lat:value.lat,lon:value.lon,address:String(value.address || ''),receivedAt:Date.now()};
+      $('navi-location-status').textContent = '내비 현재 위치를 받았습니다. 출발지로 사용할지 선택하세요.';
+      $('use-navi-location').hidden = false;
+    } else if (data.event === 'destination' && value && Number.isFinite(value.lat) && Number.isFinite(value.lon)) {
       const expected = plan.stops.at(-1);
       if (coordinate(expected) && straightDistance(expected, value) > 0.5) {
         $('navi-status').textContent = '내비 목적지 ' + String(value.name || '목적지') + '가 저장된 마지막 장소와 다릅니다. 일정이 바뀌었나요?';
@@ -263,6 +268,14 @@
   $('navi-change').addEventListener('click', () => {
     $('navi-change').hidden = true; $('navi-keep').hidden = true;
     $('voice-route').click(); $('voice-status').scrollIntoView({behavior:'smooth',block:'center'});
+  });
+  $('use-navi-location').addEventListener('click', () => {
+    if (!naviLocation || Date.now() - naviLocation.receivedAt > 120000) {
+      $('navi-location-status').textContent = '위치가 오래됐습니다. 내비 연결 및 일정 확인을 다시 눌러 주세요.'; return;
+    }
+    plan.origin = {name:'내비 현재 위치',lat:naviLocation.lat,lon:naviLocation.lon,label:naviLocation.address || 'Pleos 내비 현재 위치'};
+    changed(); render();
+    $('navi-location-status').textContent = '현재 위치를 출발지로 선택했습니다. 외부 도로 경로 계산 시 좌표가 전송됩니다.';
   });
   $('navi-keep').addEventListener('click', () => {
     $('navi-change').hidden = true; $('navi-keep').hidden = true;

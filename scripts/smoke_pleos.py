@@ -19,7 +19,8 @@ def tap_label(xml, label):
     try: root = ET.fromstring(xml)
     except ET.ParseError: return False
     for node in root.iter("node"):
-        if label not in node.get("text", "") and label not in node.get("content-desc", ""): continue
+        if label != node.get("text", "") and label != node.get("content-desc", ""): continue
+        if node.get("package") != "kr.mycabin.app" or node.get("class") != "android.widget.Button": continue
         b = re.findall(r"\d+", node.get("bounds", ""))
         if len(b) != 4: continue
         x1,y1,x2,y2 = map(int,b)
@@ -44,11 +45,10 @@ if not opened_from_library:
 found = False
 for i in range(10):
     time.sleep(15)
-    adb("shell","input","tap","700","135",check=False)
     xml = tree()
     (OUT/"tree.xml").write_text(xml)
     screenshot("02-latest-app-window")
-    if "계획 계산하기" in xml and "차량 배터리 조회" in xml:
+    if 'resource-id="read-soc"' in xml and 'package="kr.mycabin.app"' in xml:
         found = True
         break
 (OUT/"launch-method.txt").write_text("launcher" if opened_from_library else "adb activity")
@@ -57,11 +57,24 @@ for i in range(10):
 if not found:
     raise AssertionError("App was installed and launched, but its interactive content was not observed in the Pleos UI tree.")
 if tap_label(xml,"차량 배터리 조회"):
-    time.sleep(20)
+    time.sleep(8)
     xml=tree()
     (OUT/"battery-tree.xml").write_text(xml)
     screenshot("03-pleos-battery-result")
-if tap_label(xml,"계획 계산하기"):
+    (OUT/"battery-logcat.txt").write_text(adb("logcat","-d",check=False))
+if 'package="kr.mycabin.app"' not in xml:
+    adb("shell","am","start","-W","-n","kr.mycabin.app/.MainActivity")
+    time.sleep(15)
+    xml=tree()
+for i in range(6):
+    if tap_label(xml,"계획 계산하기"):
+        break
+    adb("shell","input","swipe","1300","850","1300","450","500",check=False)
+    time.sleep(2)
+    xml=tree()
+else:
+    xml = ""
+if xml:
     time.sleep(8)
     (OUT/"calculation-tree.xml").write_text(tree())
     screenshot("04-pleos-calculation")

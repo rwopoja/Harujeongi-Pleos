@@ -1,4 +1,4 @@
-name: Pleos emulator installation check
+name: Pleos emulator launch and interaction check
 on:
   workflow_dispatch:
   push:
