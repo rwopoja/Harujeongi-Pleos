@@ -2,13 +2,15 @@
 (() => {
   const $ = id => document.getElementById(id);
   const STORE = 'ev-planner-v2';
-  const emptyPoint = name => ({name: name || '', lat: null, lon: null, label: ''});
+  const emptyPoint = name => ({name: name || '', lat: null, lon: null, label: '', stopHours: 0, stopPower: 0});
   let plan;
   try { plan = JSON.parse(localStorage.getItem(STORE)); } catch (_) {}
   if (!plan || !plan.origin || !Array.isArray(plan.stops)) plan = {origin: emptyPoint(), stops: []};
   const clean = point => {
     if (!point || typeof point.name !== 'string') return emptyPoint();
     const cleanPoint = emptyPoint(point.name.slice(0, 150));
+    if (Number.isFinite(point.stopHours) && point.stopHours >= 0 && point.stopHours <= 24) cleanPoint.stopHours = point.stopHours;
+    if (Number.isFinite(point.stopPower) && point.stopPower >= 0 && point.stopPower <= 20) cleanPoint.stopPower = point.stopPower;
     if (Number.isFinite(point.lat) && Math.abs(point.lat) <= 90 && Number.isFinite(point.lon) && Math.abs(point.lon) <= 180 && typeof point.label === 'string') {
       cleanPoint.lat = point.lat; cleanPoint.lon = point.lon; cleanPoint.label = point.label.slice(0, 500);
     }
@@ -16,6 +18,11 @@
   };
   plan.origin = clean(plan.origin); plan.stops = plan.stops.slice(0, 8).map(clean);
   let draft = [], revision = 0, serial = 0;
+  let distanceFromRoute = false;
+  try {
+    distanceFromRoute = localStorage.getItem('ev-route-distance-derived-v1') === 'true';
+    if (localStorage.getItem('ev-route-distance-invalid-v1') === 'true') $('distance').value = '';
+  } catch (_) {}
   const pending = new Map();
   let uxRestricted = !!window.HaruNative;
   const uxDisabled = new WeakMap();
@@ -47,6 +54,13 @@
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(plan)); } catch (_) { $('map-status').textContent = '계획을 기기에 저장하지 못했습니다.'; } };
   const changed = () => {
     revision++;
+    if (distanceFromRoute) {
+      $('distance').value = '';
+      $('charger-distance').value = '';
+      $('charger-name').value = '';
+      distanceFromRoute = false;
+      try { localStorage.removeItem('ev-route-distance-derived-v1'); localStorage.setItem('ev-route-distance-invalid-v1', 'true'); } catch (_) {}
+    }
     $('map-status').textContent = '장소가 바뀌었습니다. 장소를 확인하고 경로를 다시 계산해 주세요.';
     $('result').textContent = '일정이 변경됐습니다. 거리와 차량 정보를 확인하고 다시 계산해 주세요.';
     $('charge-result').textContent = '일정이 변경됐습니다. 충전 계획을 다시 계산해 주세요.';
@@ -195,7 +209,18 @@
       const search = button('이 장소 검색', () => searchPoint(point, results), 'sub');
       const remove = button('삭제', () => { plan.stops.splice(i, 1); changed(); render(); }, 'sub');
       const up = button('앞으로', () => { if (i > 0) { [plan.stops[i - 1], plan.stops[i]] = [plan.stops[i], plan.stops[i - 1]]; changed(); render(); } }, 'sub');
-      card.append(heading, input, search, up, remove, results); host.append(card);
+      const hours = document.createElement('input'); hours.type = 'number'; hours.min = '0'; hours.max = '24'; hours.step = 'any'; hours.value = point.stopHours; hours.setAttribute('aria-label', '목적지 ' + (i + 1) + ' 차량 전기 사용 시간');
+      const power = document.createElement('input'); power.type = 'number'; power.min = '0'; power.max = '20'; power.step = 'any'; power.value = point.stopPower; power.setAttribute('aria-label', '목적지 ' + (i + 1) + ' 정차 평균 소비전력');
+      const hoursLabel = document.createElement('label'); hoursLabel.textContent = '차량에서 전기를 쓰는 시간 (시간)'; hoursLabel.append(hours);
+      const powerLabel = document.createElement('label'); powerLabel.textContent = '그 시간의 평균 소비전력 (kW)'; powerLabel.append(power);
+      for (const [field, key] of [[hours, 'stopHours'], [power, 'stopPower']]) field.addEventListener('input', () => {
+        const value = field.value === '' ? null : Number(field.value);
+        point[key] = value; save();
+        $('stop-energy-status').textContent = '정차 계획이 변경됐습니다. 정차 에너지 적용 버튼을 다시 눌러 주세요.';
+        $('result').textContent = '정차 계획이 변경됐습니다. 정차 에너지를 적용하고 계획을 다시 계산해 주세요.';
+        $('charge-result').textContent = '정차 계획이 변경됐습니다. 정차 에너지를 적용하고 충전 계획을 다시 계산해 주세요.';
+      });
+      card.append(heading, input, search, up, remove, results, hoursLabel, powerLabel); host.append(card);
     });
     const anchor = $('charger-anchor'); anchor.replaceChildren();
     [plan.origin, ...plan.stops].forEach((p, i) => {
@@ -218,8 +243,27 @@
   }
   function applyDistance(km) {
     $('distance').value = km.toFixed(1);
+    distanceFromRoute = true;
+    try { localStorage.setItem('ev-route-distance-derived-v1', 'true'); localStorage.removeItem('ev-route-distance-invalid-v1'); } catch (_) {}
     $('form').dispatchEvent(new Event('submit', {cancelable:true, bubbles:true}));
   }
+  $('distance').addEventListener('input', () => {
+    distanceFromRoute = false;
+    try { localStorage.removeItem('ev-route-distance-derived-v1'); localStorage.removeItem('ev-route-distance-invalid-v1'); } catch (_) {}
+  });
+  $('apply-stop-energy').addEventListener('click', () => {
+    if (!plan.stops.length) { $('stop-energy-status').textContent = '목적지를 추가한 뒤 정차 계획을 입력해 주세요.'; return; }
+    if (plan.stops.some(p => !Number.isFinite(p.stopHours) || p.stopHours < 0 || p.stopHours > 24 || !Number.isFinite(p.stopPower) || p.stopPower < 0 || p.stopPower > 20)) {
+      $('stop-energy-status').textContent = '각 장소의 시간은 0~24시간, 소비전력은 0~20kW로 입력해 주세요.'; return;
+    }
+    const hours = plan.stops.reduce((sum, p) => sum + p.stopHours, 0);
+    if (hours > 24) { $('stop-energy-status').textContent = '전기 사용 시간의 합계는 24시간 이하여야 합니다.'; return; }
+    const energy = plan.stops.reduce((sum, p) => sum + p.stopHours * p.stopPower, 0);
+    $('hours').value = String(hours); $('power').value = String(hours ? energy / hours : 0);
+    $('hours').dispatchEvent(new Event('input', {bubbles:true}));
+    $('power').dispatchEvent(new Event('input', {bubbles:true}));
+    $('stop-energy-status').textContent = '정차 전력 합계 ' + energy.toFixed(2) + ' kWh를 계획 입력값에 반영했습니다. 계획 계산하기를 눌러 주세요.';
+  });
   $('route-search').addEventListener('click', async () => {
     const at = revision; $('map-status').textContent = '선택한 장소로 도로 경로를 계산하고 있습니다…';
     try {

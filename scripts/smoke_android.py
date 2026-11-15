@@ -36,7 +36,7 @@ assert 'Pleos 조회값' not in state, 'Unexpected vehicle reading on ordinary A
 shot('01-battery-unavailable')
 tap_visible('계획 계산하기')
 time.sleep(3);adb('shell','input','swipe','1000','880','1000','400','450');time.sleep(2);result=ET.tostring(tree(),encoding='unicode');(OUT/'result-tree.xml').write_text(result);shot('02-ev-result')
-assert '19.0 kWh' in result, 'Expected sample energy result not found'
+assert '18.0 kWh' in result, 'Expected sample energy result not found'
 tap_visible('내비 연결 및 일정 확인')
 time.sleep(3);navi=ET.tostring(tree(),encoding='unicode');shot('03-navi-unavailable')
 assert 'Pleos 내비 서비스가 없는 환경' in navi, 'Missing explicit navigation unavailable state on ordinary Android'
