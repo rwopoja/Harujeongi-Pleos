@@ -65,7 +65,7 @@ try:
     click_id("origin-search","up")
     choose_search_result("origin-results",set())
     tap(seek("down",text="이 장소 검색"))
-    choose_search_result("points",{"이 장소 검색","앞으로","삭제"})
+    choose_search_result("points",{"이 장소 검색","앞으로","삭제","이 장소 방문·정차 완료"})
     click_id("route-search")
     time.sleep(20)
     root=tree()
