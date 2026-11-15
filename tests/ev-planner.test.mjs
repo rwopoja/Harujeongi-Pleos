@@ -40,6 +40,10 @@ w.dispatchEvent(new w.CustomEvent('ev-ux',{detail:{state:'vehicle',restricted:fa
 assert.equal($('route-search').disabled,false);
 
 assert.deepEqual([...w.EvPlanner.parseStops('오늘 서울역에 갔다가 강남역 들르고 집에 갈 거야')], ['서울역','강남역','집']);
+assert.deepEqual([...w.EvPlanner.parseStops('오늘 회사에 갔다가 퇴근 후 성수에서 친구를 만나고, 마트에 들렀다가 집에 돌아올 거야')], ['회사','성수','마트','집']);
+$('route').value='친구 기다리는 동안 에어컨을 한 시간 켤 거야';$('parse-plan').click();
+assert.equal($('apply-draft').hidden,true);assert.match($('draft-status').textContent,/정차/);
+
 $('route').value = '오늘 서울역에 갔다가 강남역 들르고 집에 갈 거야';
 $('parse-plan').click();
 assert.match($('draft-status').textContent, /서울역 → 강남역 → 집/);

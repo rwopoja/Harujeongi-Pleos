@@ -1,6 +1,11 @@
 import {Window} from 'happy-dom';import fs from 'node:fs';import assert from 'node:assert/strict';
 const w=new Window({url:'https://example.test'});let requestId='';w.HaruNative={listen(){},readBattery(id){requestId=id;}};w.document.write(fs.readFileSync('web/ev-day.html','utf8').replace(/<script[^>]*><\/script>/g,''));for(const file of ['web/ev-day.js','web/ev-journey.js','web/ev-planner.js'])w.eval(fs.readFileSync(file,'utf8'));w.dispatchEvent(new w.CustomEvent('ev-ux',{detail:{state:'phone',restricted:false}}));const $=s=>w.document.querySelector(s);
 assert.equal($('#hours').value,'0');assert.equal($('#power').value,'0');
+$('#soc').value='10';$('#cap').value='60';$('#eff').value='5';$('#distance').value='30';$('#reserve').value='0';
+$('#form').dispatchEvent(new w.Event('submit',{cancelable:true}));assert.match($('#result').innerText,/소진/);
+$('#charger-distance').value='0';$('#charge-calc').click();assert.match($('#charge-result').textContent,/목표 여유를 높이고/);
+$('#soc').value='70';$('#reserve').value='20';$('#distance').value='90';
+
 $('#read-soc').click();w.dispatchEvent(new w.CustomEvent('pleos-result',{detail:{event:'EV_SOC_wrong',value:'99'}}));assert.equal($('#soc').value,'70');w.dispatchEvent(new w.CustomEvent('pleos-result',{detail:{event:'EV_SOC_'+requestId,value:'75'}}));assert.equal($('#soc').value,'75');$('#soc').value='70';$('#voice-route').click();w.dispatchEvent(new w.CustomEvent('haru-voice',{detail:{text:'회사 → 집'}}));assert.equal($('#route').value,'회사 → 집');$('#save-route').click();assert.match(w.localStorage.getItem('ev-day-route-v1'),/회사/);
 $('#hours').value='2';$('#power').value='0.5';
 $('#charger-distance').value='20';$('#charge-added').value='10';$('#charge-scenario').click();assert.match($('#charge-scenario-result').textContent,/55\.0%/);

@@ -8,6 +8,7 @@ on:
       - 'app/**'
       - 'scripts/build_local.py'
       - 'scripts/smoke_android.py'
+      - 'scripts/smoke_android_map.py'
 permissions:
   contents: read
 jobs:
@@ -28,6 +29,7 @@ jobs:
           npm ci
           node tests/ev-journey-smoke.mjs
           node tests/ev-planner.test.mjs
+          node tests/ev-progress.test.mjs
       - name: Check public map service response formats
         continue-on-error: true
         run: python3 scripts/test_open_services.py
